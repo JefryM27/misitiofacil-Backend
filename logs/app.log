@@ -1,0 +1,920 @@
+[2025-08-19 07:37:27] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 07:37:27] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 07:37:27] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 07:37:27] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 07:37:27] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-19 07:37:51] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 07:37:51] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 07:37:51] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 07:37:51] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 07:37:51] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-19 07:41:42] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 07:41:42] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 07:41:42] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 07:41:42] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 07:41:42] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-19 07:51:39] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 07:51:39] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 07:51:39] [INFO] 📋 Información del entorno:
+[2025-08-19 07:51:39] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 07:51:39] [INFO] ✅ Configuración JWT válida
+[2025-08-19 07:51:39] [INFO]    Entorno: development
+[2025-08-19 07:51:39] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority
+[2025-08-19 07:51:39] [INFO]    Puerto: 4000
+[2025-08-19 07:51:39] [INFO]    - CORS permisivo habilitado
+[2025-08-19 07:51:39] [INFO]    - Logs detallados habilitados
+[2025-08-19 07:51:39] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 07:51:39] [INFO]    - Rate limiting relajado
+[2025-08-19 07:51:39] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 07:51:39] [INFO]    - Hot reload con nodemon
+[2025-08-19 07:51:39] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 07:51:39] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 07:51:39] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 07:51:39] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 07:54:59] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 07:54:59] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 07:54:59] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 07:54:59] [INFO] ✅ Configuración JWT válida
+[2025-08-19 07:54:59] [INFO]    Puerto: 4000
+[2025-08-19 07:54:59] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 07:54:59] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 07:54:59] [INFO]    Entorno: development
+[2025-08-19 07:54:59] [INFO] 📋 Información del entorno:
+[2025-08-19 07:54:59] [INFO]    - CORS permisivo habilitado
+[2025-08-19 07:54:59] [INFO]    - Hot reload con nodemon
+[2025-08-19 07:54:59] [INFO]    - Rate limiting relajado
+[2025-08-19 07:54:59] [INFO]    - Logs detallados habilitados
+[2025-08-19 07:54:59] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 07:55:00] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 07:55:00] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 07:55:00] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 07:55:00] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:02:24] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:02:24] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:02:24] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:02:24] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:02:24] [INFO]    Entorno: development
+[2025-08-19 08:02:24] [INFO] 📋 Información del entorno:
+[2025-08-19 08:02:24] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:02:24] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:02:24] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:02:24] [INFO]    Puerto: 4000
+[2025-08-19 08:02:24] [INFO]    - Rate limiting relajado
+[2025-08-19 08:02:24] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:02:24] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:02:24] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:02:24] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:02:24] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:02:24] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:02:24] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:02:42] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:02:42] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:02:42] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:02:42] [INFO] 📋 Información del entorno:
+[2025-08-19 08:02:42] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:02:42] [INFO]    Entorno: development
+[2025-08-19 08:02:42] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:02:42] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:02:42] [INFO]    Puerto: 4000
+[2025-08-19 08:02:42] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:02:42] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:02:42] [INFO]    - Rate limiting relajado
+[2025-08-19 08:02:42] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:02:42] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:02:42] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:02:42] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:02:42] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:02:42] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:06:23] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:06:23] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:06:23] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:06:23] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:06:23] [INFO] 📋 Información del entorno:
+[2025-08-19 08:06:23] [INFO]    Puerto: 4000
+[2025-08-19 08:06:23] [INFO]    Entorno: development
+[2025-08-19 08:06:23] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:06:23] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:06:23] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:06:23] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:06:23] [INFO]    - Rate limiting relajado
+[2025-08-19 08:06:23] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:06:23] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:06:24] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:06:24] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:06:24] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:06:24] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:08:07] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:08:07] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:08:07] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:08:07] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:08:07] [INFO] 📋 Información del entorno:
+[2025-08-19 08:08:07] [INFO]    Puerto: 4000
+[2025-08-19 08:08:07] [INFO]    Entorno: development
+[2025-08-19 08:08:07] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:08:07] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:08:07] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:08:07] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:08:07] [INFO]    - Rate limiting relajado
+[2025-08-19 08:08:07] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:08:07] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:08:07] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:08:07] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:08:07] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:08:07] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:09:39] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:09:39] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:09:39] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:09:39] [INFO] 📋 Información del entorno:
+[2025-08-19 08:09:39] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:09:39] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:09:39] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:09:39] [INFO]    - Rate limiting relajado
+[2025-08-19 08:09:39] [INFO]    Entorno: development
+[2025-08-19 08:09:39] [INFO]    Puerto: 4000
+[2025-08-19 08:09:39] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:09:39] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:09:39] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:09:39] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:09:40] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:09:40] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:09:40] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:09:40] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:09:50] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:09:50] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:09:50] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:09:50] [INFO]    Entorno: development
+[2025-08-19 08:09:50] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:09:50] [INFO]    Puerto: 4000
+[2025-08-19 08:09:50] [INFO] 📋 Información del entorno:
+[2025-08-19 08:09:50] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:09:50] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:09:50] [INFO]    - Rate limiting relajado
+[2025-08-19 08:09:50] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:09:50] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:09:50] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:09:50] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:09:51] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:09:51] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:09:51] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:09:51] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:12:45] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:12:45] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:12:45] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:12:45] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:12:45] [INFO]    Entorno: development
+[2025-08-19 08:12:45] [INFO] 📋 Información del entorno:
+[2025-08-19 08:12:45] [INFO]    Puerto: 4000
+[2025-08-19 08:12:45] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:12:45] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:12:45] [INFO]    - Rate limiting relajado
+[2025-08-19 08:12:45] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:12:45] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:12:45] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:12:45] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:12:46] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:12:46] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:12:46] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:12:46] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:17:46] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:17:46] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:17:46] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:17:46] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:17:46] [INFO] 📋 Información del entorno:
+[2025-08-19 08:17:46] [INFO]    Entorno: development
+[2025-08-19 08:17:46] [INFO]    Puerto: 4000
+[2025-08-19 08:17:46] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:17:46] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:17:46] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:17:46] [INFO]    - Rate limiting relajado
+[2025-08-19 08:17:46] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:17:46] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:17:46] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:17:46] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:17:46] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:17:46] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:17:46] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:19:15] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:19:15] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:19:15] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:19:15] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:19:15] [INFO] 📋 Información del entorno:
+[2025-08-19 08:19:15] [INFO]    Entorno: development
+[2025-08-19 08:19:15] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:19:15] [INFO]    Puerto: 4000
+[2025-08-19 08:19:15] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:19:15] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:19:15] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:19:15] [INFO]    - Rate limiting relajado
+[2025-08-19 08:19:15] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:19:15] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:19:15] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:19:15] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:19:15] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:19:15] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:19:15] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-19 08:19:15] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-19 08:19:16] [INFO] 📁 Almacenamiento local configurado
+[2025-08-19 08:19:17] [INFO] 🔗 URLs útiles:
+[2025-08-19 08:19:17] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-19 08:19:16] [INFO] 📧 Servicio de email configurado
+[2025-08-19 08:19:17] [INFO]    Auth: http://localhost:4000/api/auth
+[2025-08-19 08:19:17] [INFO]    Business: http://localhost:4000/api/business
+[2025-08-19 08:19:17] [INFO]    Reservations: http://localhost:4000/api/reservations
+[2025-08-19 08:19:17] [INFO]    Services: http://localhost:4000/api/services
+[2025-08-19 08:19:17] [INFO]    Documentación: http://localhost:4000/api-docs
+[2025-08-19 08:19:17] [INFO]    API Base: http://localhost:4000/api
+[2025-08-19 08:19:17] [INFO] 🔧 Comandos útiles:
+[2025-08-19 08:19:17] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-19 08:19:17] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-19 08:19:17] [INFO]    npm start       - Iniciar en producción
+[2025-08-19 08:19:17] [INFO]    Health Check: http://localhost:4000/health
+[2025-08-19 08:19:17] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-19 08:19:17] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-19 08:19:17] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-19 08:19:17] [INFO] 🌍 Entorno: undefined
+[2025-08-19 08:19:17] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-19 08:19:17] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-19 08:19:17] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":14388,"memory":{"rss":99151872,"heapTotal":65032192,"heapUsed":35169000,"external":22310767,"arrayBuffers":18398288}}
+[2025-08-19 08:19:17] [INFO] 🚀 Servidor ejecutándose en puerto undefined
+[2025-08-19 08:21:50] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-19 08:21:50] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-19 08:21:50] [INFO] ✅ Variables de entorno verificadas
+[2025-08-19 08:21:50] [INFO] ✅ Configuración JWT válida
+[2025-08-19 08:21:50] [INFO] 📋 Información del entorno:
+[2025-08-19 08:21:50] [INFO]    Entorno: development
+[2025-08-19 08:21:50] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-19 08:21:50] [INFO] 🛠️ Modo desarrollo:
+[2025-08-19 08:21:50] [INFO]    - CORS permisivo habilitado
+[2025-08-19 08:21:50] [INFO]    - Rate limiting relajado
+[2025-08-19 08:21:50] [INFO]    - Logs detallados habilitados
+[2025-08-19 08:21:50] [INFO]    - Hot reload con nodemon
+[2025-08-19 08:21:50] [INFO]    Puerto: 4000
+[2025-08-19 08:21:50] [INFO] 📦 Cargando aplicación Express...
+[2025-08-19 08:21:50] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-19 08:21:50] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-19 08:21:50] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-19 08:21:50] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-19 08:21:50] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-19 08:21:50] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-19 08:21:51] [INFO] 📧 Servicio de email configurado
+[2025-08-19 08:21:51] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-19 08:21:51] [INFO] 🔗 URLs útiles:
+[2025-08-19 08:21:51] [INFO] 📁 Almacenamiento local configurado
+[2025-08-19 08:21:51] [INFO]    Auth: http://localhost:4000/api/auth
+[2025-08-19 08:21:51] [INFO]    Business: http://localhost:4000/api/business
+[2025-08-19 08:21:51] [INFO]    Services: http://localhost:4000/api/services
+[2025-08-19 08:21:51] [INFO]    Documentación: http://localhost:4000/api-docs
+[2025-08-19 08:21:51] [INFO]    Health Check: http://localhost:4000/health
+[2025-08-19 08:21:51] [INFO]    Reservations: http://localhost:4000/api/reservations
+[2025-08-19 08:21:51] [INFO] 🔧 Comandos útiles:
+[2025-08-19 08:21:51] [INFO]    npm start       - Iniciar en producción
+[2025-08-19 08:21:51] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-19 08:21:51] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-19 08:21:51] [INFO]    API Base: http://localhost:4000/api
+[2025-08-19 08:21:51] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-19 08:21:51] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-19 08:21:51] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-19 08:21:51] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-19 08:21:51] [INFO] 🚀 Servidor ejecutándose en puerto 4000
+[2025-08-19 08:21:51] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":21240,"memory":{"rss":97869824,"heapTotal":65294336,"heapUsed":35092392,"external":22318759,"arrayBuffers":18406280}}
+[2025-08-19 08:21:51] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-19 08:21:51] [INFO] 🌍 Entorno: undefined
+[2025-08-20 07:51:52] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 07:51:52] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 07:51:52] [INFO] 📋 Información del entorno:
+[2025-08-20 07:51:52] [INFO] ✅ Configuración JWT válida
+[2025-08-20 07:51:52] [INFO]    Entorno: development
+[2025-08-20 07:51:52] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 07:51:52] [INFO]    Puerto: 4000
+[2025-08-20 07:51:52] [INFO] 🛠️ Modo desarrollo:
+[2025-08-20 07:51:52] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 07:51:52] [INFO]    - Rate limiting relajado
+[2025-08-20 07:51:52] [INFO]    - CORS permisivo habilitado
+[2025-08-20 07:51:52] [INFO]    - Logs detallados habilitados
+[2025-08-20 07:51:52] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 07:51:52] [INFO]    - Hot reload con nodemon
+[2025-08-20 07:51:54] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 07:51:54] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 07:51:54] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 07:51:54] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 07:51:54] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 07:51:54] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 07:51:55] [INFO] 📧 Servicio de email configurado
+[2025-08-20 07:51:55] [INFO] 📁 Almacenamiento local configurado
+[2025-08-20 07:51:55] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 07:51:55] [INFO]    Auth: http://localhost:4000/api/auth
+[2025-08-20 07:51:55] [INFO]    API Base: http://localhost:4000/api
+[2025-08-20 07:51:55] [INFO]    Business: http://localhost:4000/api/business
+[2025-08-20 07:51:55] [INFO]    Services: http://localhost:4000/api/services
+[2025-08-20 07:51:55] [INFO]    Reservations: http://localhost:4000/api/reservations
+[2025-08-20 07:51:55] [INFO]    Documentación: http://localhost:4000/api-docs
+[2025-08-20 07:51:55] [INFO]    Health Check: http://localhost:4000/health
+[2025-08-20 07:51:55] [INFO] 🔧 Comandos útiles:
+[2025-08-20 07:51:55] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 07:51:55] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-20 07:51:55] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 07:51:55] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-20 07:51:55] [INFO] 🚀 Servidor ejecutándose en puerto 4000
+[2025-08-20 07:51:55] [INFO] 🔗 URLs útiles:
+[2025-08-20 07:51:55] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 07:51:55] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-20 07:51:55] [INFO] 🌍 Entorno: undefined
+[2025-08-20 07:51:55] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-20 07:51:55] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":17712,"memory":{"rss":101834752,"heapTotal":64770048,"heapUsed":35060360,"external":22310767,"arrayBuffers":18398288}}
+[2025-08-20 07:51:55] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-20 07:54:53] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 07:54:53] [INFO] ✅ Configuración JWT válida
+[2025-08-20 07:54:53] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 07:54:53] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 07:54:53] [INFO] 📋 Información del entorno:
+[2025-08-20 07:54:53] [INFO]    Entorno: development
+[2025-08-20 07:54:53] [INFO]    Puerto: 4000
+[2025-08-20 07:54:53] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 07:54:53] [INFO]    - CORS permisivo habilitado
+[2025-08-20 07:54:53] [INFO] 🛠️ Modo desarrollo:
+[2025-08-20 07:54:53] [INFO]    - Rate limiting relajado
+[2025-08-20 07:54:53] [INFO]    - Logs detallados habilitados
+[2025-08-20 07:54:53] [INFO]    - Hot reload con nodemon
+[2025-08-20 07:54:53] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 07:54:53] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 07:54:53] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 07:54:53] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 07:54:53] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 07:54:53] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 07:54:53] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 07:54:54] [INFO] 📧 Servicio de email configurado
+[2025-08-20 07:54:54] [INFO] 📁 Almacenamiento local configurado
+[2025-08-20 07:54:54] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 07:54:54] [INFO]    API Base: http://localhost:4000/api
+[2025-08-20 07:54:54] [INFO]    Auth: http://localhost:4000/api/auth
+[2025-08-20 07:54:54] [INFO]    Business: http://localhost:4000/api/business
+[2025-08-20 07:54:54] [INFO]    Services: http://localhost:4000/api/services
+[2025-08-20 07:54:54] [INFO]    Health Check: http://localhost:4000/health
+[2025-08-20 07:54:54] [INFO]    Reservations: http://localhost:4000/api/reservations
+[2025-08-20 07:54:54] [INFO] 🔧 Comandos útiles:
+[2025-08-20 07:54:54] [INFO]    Documentación: http://localhost:4000/api-docs
+[2025-08-20 07:54:54] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 07:54:54] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-20 07:54:54] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-20 07:54:54] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 07:54:54] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-20 07:54:54] [INFO] 🚀 Servidor ejecutándose en puerto 4000
+[2025-08-20 07:54:54] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 07:54:54] [INFO] 🌍 Entorno: undefined
+[2025-08-20 07:54:54] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-20 07:54:54] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-20 07:54:54] [INFO] 🔗 URLs útiles:
+[2025-08-20 07:54:54] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":5516,"memory":{"rss":99368960,"heapTotal":65294336,"heapUsed":35016648,"external":22310767,"arrayBuffers":18398288}}
+[2025-08-20 07:55:01] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 07:55:01] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 07:55:01] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 07:55:01] [INFO] 📋 Información del entorno:
+[2025-08-20 07:55:01] [INFO] ✅ Configuración JWT válida
+[2025-08-20 07:55:01] [INFO]    Entorno: development
+[2025-08-20 07:55:01] [INFO]    Puerto: 4000
+[2025-08-20 07:55:01] [INFO] 🛠️ Modo desarrollo:
+[2025-08-20 07:55:01] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 07:55:01] [INFO]    - Rate limiting relajado
+[2025-08-20 07:55:01] [INFO]    - CORS permisivo habilitado
+[2025-08-20 07:55:01] [INFO]    - Logs detallados habilitados
+[2025-08-20 07:55:01] [INFO]    - Hot reload con nodemon
+[2025-08-20 07:55:01] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 07:55:02] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 07:55:02] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 07:55:02] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 07:55:02] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 07:55:02] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 07:55:02] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 07:55:02] [INFO] 📁 Almacenamiento local configurado
+[2025-08-20 07:55:02] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 07:55:02] [INFO] 📧 Servicio de email configurado
+[2025-08-20 07:55:02] [INFO] 🔗 URLs útiles:
+[2025-08-20 07:55:02] [INFO]    API Base: http://localhost:4000/api
+[2025-08-20 07:55:02] [INFO]    Business: http://localhost:4000/api/business
+[2025-08-20 07:55:02] [INFO]    Services: http://localhost:4000/api/services
+[2025-08-20 07:55:02] [INFO]    Reservations: http://localhost:4000/api/reservations
+[2025-08-20 07:55:02] [INFO]    Auth: http://localhost:4000/api/auth
+[2025-08-20 07:55:02] [INFO]    Health Check: http://localhost:4000/health
+[2025-08-20 07:55:02] [INFO] 🔧 Comandos útiles:
+[2025-08-20 07:55:02] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 07:55:02] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 07:55:02] [INFO]    Documentación: http://localhost:4000/api-docs
+[2025-08-20 07:55:02] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-20 07:55:02] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-20 07:55:02] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-20 07:55:02] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-20 07:55:02] [INFO] 🌍 Entorno: undefined
+[2025-08-20 07:55:02] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 07:55:02] [INFO] 🚀 Servidor ejecutándose en puerto 4000
+[2025-08-20 07:55:02] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":11364,"memory":{"rss":99479552,"heapTotal":65294336,"heapUsed":35036792,"external":22318959,"arrayBuffers":18406480}}
+[2025-08-20 07:55:02] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-20 07:57:36] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 07:57:36] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 07:57:36] [INFO] ✅ Configuración JWT válida
+[2025-08-20 07:57:36] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 07:57:36] [INFO] 📋 Información del entorno:
+[2025-08-20 07:57:36] [INFO]    Puerto: 4000
+[2025-08-20 07:57:36] [INFO]    Entorno: development
+[2025-08-20 07:57:36] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 07:57:36] [INFO] 🛠️ Modo desarrollo:
+[2025-08-20 07:57:36] [INFO]    - CORS permisivo habilitado
+[2025-08-20 07:57:36] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 07:57:36] [INFO]    - Rate limiting relajado
+[2025-08-20 07:57:36] [INFO]    - Hot reload con nodemon
+[2025-08-20 07:57:36] [INFO]    - Logs detallados habilitados
+[2025-08-20 07:57:37] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 07:57:37] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 07:57:37] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 07:57:37] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 07:57:37] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 07:57:37] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 07:57:38] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 07:57:38] [INFO] 🔗 URLs útiles:
+[2025-08-20 07:57:38] [INFO] 📁 Almacenamiento local configurado
+[2025-08-20 07:57:38] [INFO]    Auth: http://localhost:4000/api/auth
+[2025-08-20 07:57:38] [INFO]    API Base: http://localhost:4000/api
+[2025-08-20 07:57:38] [INFO] 📧 Servicio de email configurado
+[2025-08-20 07:57:38] [INFO]    Business: http://localhost:4000/api/business
+[2025-08-20 07:57:38] [INFO]    Reservations: http://localhost:4000/api/reservations
+[2025-08-20 07:57:38] [INFO]    Documentación: http://localhost:4000/api-docs
+[2025-08-20 07:57:38] [INFO]    Health Check: http://localhost:4000/health
+[2025-08-20 07:57:38] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 07:57:38] [INFO]    Services: http://localhost:4000/api/services
+[2025-08-20 07:57:38] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-20 07:57:38] [INFO] 🔧 Comandos útiles:
+[2025-08-20 07:57:38] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 07:57:38] [INFO] 🚀 Servidor ejecutándose en puerto 4000
+[2025-08-20 07:57:38] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-20 07:57:38] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-20 07:57:38] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 07:57:38] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-20 07:57:38] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-20 07:57:38] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":7036,"memory":{"rss":114040832,"heapTotal":70275072,"heapUsed":40144472,"external":22311735,"arrayBuffers":18398088}}
+[2025-08-20 07:57:38] [INFO] 🌍 Entorno: undefined
+[2025-08-20 07:59:23] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 07:59:23] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 07:59:23] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 07:59:23] [INFO] ✅ Configuración JWT válida
+[2025-08-20 07:59:23] [INFO] 📋 Información del entorno:
+[2025-08-20 07:59:23] [INFO]    Entorno: development
+[2025-08-20 07:59:23] [INFO]    - CORS permisivo habilitado
+[2025-08-20 07:59:23] [INFO]    Puerto: 4000
+[2025-08-20 07:59:23] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 07:59:23] [INFO]    - Logs detallados habilitados
+[2025-08-20 07:59:23] [INFO] 🛠️ Modo desarrollo:
+[2025-08-20 07:59:23] [INFO]    - Rate limiting relajado
+[2025-08-20 07:59:23] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 07:59:23] [INFO]    - Hot reload con nodemon
+[2025-08-20 07:59:24] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 07:59:24] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 07:59:24] [INFO] ✅ Configuración JWT válida
+[2025-08-20 07:59:24] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 07:59:24] [INFO]    Entorno: development
+[2025-08-20 07:59:24] [INFO] 📋 Información del entorno:
+[2025-08-20 07:59:24] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 07:59:24] [INFO]    Puerto: 4000
+[2025-08-20 07:59:24] [INFO] 🛠️ Modo desarrollo:
+[2025-08-20 07:59:24] [INFO]    - Rate limiting relajado
+[2025-08-20 07:59:24] [INFO]    - CORS permisivo habilitado
+[2025-08-20 07:59:24] [INFO]    - Hot reload con nodemon
+[2025-08-20 07:59:24] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 07:59:24] [INFO]    - Logs detallados habilitados
+[2025-08-20 07:59:25] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 07:59:25] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 07:59:25] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 07:59:25] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 07:59:25] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 07:59:25] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 07:59:26] [INFO] 📧 Servicio de email configurado
+[2025-08-20 07:59:26] [INFO] 📁 Almacenamiento local configurado
+[2025-08-20 07:59:26] [INFO]    API Base: http://localhost:4000/api
+[2025-08-20 07:59:26] [INFO]    Auth: http://localhost:4000/api/auth
+[2025-08-20 07:59:26] [INFO]    Services: http://localhost:4000/api/services
+[2025-08-20 07:59:26] [INFO] 🔗 URLs útiles:
+[2025-08-20 07:59:26] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 07:59:26] [INFO]    Reservations: http://localhost:4000/api/reservations
+[2025-08-20 07:59:26] [INFO] 🔧 Comandos útiles:
+[2025-08-20 07:59:26] [INFO]    Business: http://localhost:4000/api/business
+[2025-08-20 07:59:26] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 07:59:26] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-20 07:59:26] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 07:59:26] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-20 07:59:26] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 07:59:26] [INFO] 🚀 Servidor ejecutándose en puerto 4000
+[2025-08-20 07:59:26] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-20 07:59:26] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-20 07:59:26] [INFO] 🌍 Entorno: undefined
+[2025-08-20 07:59:26] [INFO]    Documentación: http://localhost:4000/api-docs
+[2025-08-20 07:59:26] [INFO]    Health Check: http://localhost:4000/health
+[2025-08-20 07:59:26] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":12184,"memory":{"rss":99840000,"heapTotal":65556480,"heapUsed":35060904,"external":22318959,"arrayBuffers":18406480}}
+[2025-08-20 07:59:26] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-20 08:22:26] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 08:22:26] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 08:22:26] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 08:22:26] [INFO] ✅ Configuración JWT válida
+[2025-08-20 08:22:26] [INFO]    Puerto: 4000
+[2025-08-20 08:22:26] [INFO] 📋 Información del entorno:
+[2025-08-20 08:22:26] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 08:22:26] [INFO]    - CORS permisivo habilitado
+[2025-08-20 08:22:26] [INFO] 🛠️ Modo desarrollo:
+[2025-08-20 08:22:26] [INFO]    - Rate limiting relajado
+[2025-08-20 08:22:26] [INFO]    Entorno: development
+[2025-08-20 08:22:26] [INFO]    - Logs detallados habilitados
+[2025-08-20 08:22:26] [INFO]    - Hot reload con nodemon
+[2025-08-20 08:22:26] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 08:22:27] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 08:22:27] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 08:22:27] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 08:22:27] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 08:22:27] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 08:22:27] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 08:22:28] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 08:22:28] [INFO] 📁 Almacenamiento local configurado
+[2025-08-20 08:22:28] [INFO] 📧 Servicio de email configurado
+[2025-08-20 08:22:28] [INFO]    API Base: http://localhost:4000/api
+[2025-08-20 08:22:28] [INFO]    Auth: http://localhost:4000/api/auth
+[2025-08-20 08:22:28] [INFO]    Business: http://localhost:4000/api/business
+[2025-08-20 08:22:28] [INFO]    Reservations: http://localhost:4000/api/reservations
+[2025-08-20 08:22:28] [INFO]    Documentación: http://localhost:4000/api-docs
+[2025-08-20 08:22:28] [INFO] 🔧 Comandos útiles:
+[2025-08-20 08:22:28] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 08:22:28] [INFO] 🔗 URLs útiles:
+[2025-08-20 08:22:28] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-20 08:22:28] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-20 08:22:28] [INFO]    Services: http://localhost:4000/api/services
+[2025-08-20 08:22:28] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-20 08:22:28] [INFO] 🚀 Servidor ejecutándose en puerto 4000
+[2025-08-20 08:22:28] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 08:22:28] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-20 08:22:28] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 08:22:28] [INFO]    Health Check: http://localhost:4000/health
+[2025-08-20 08:22:28] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":7132,"memory":{"rss":99835904,"heapTotal":65818624,"heapUsed":35143000,"external":22310767,"arrayBuffers":18398288}}
+[2025-08-20 08:22:28] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-20 08:22:28] [INFO] 🌍 Entorno: undefined
+[2025-08-20 08:34:51] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 08:34:51] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 08:34:51] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 08:34:51] [INFO] 📋 Información del entorno:
+[2025-08-20 08:34:51] [INFO]    Puerto: 3001
+[2025-08-20 08:34:51] [INFO]    Entorno: development
+[2025-08-20 08:34:51] [INFO] ✅ Configuración JWT válida
+[2025-08-20 08:34:51] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 08:34:51] [INFO]    - CORS permisivo habilitado
+[2025-08-20 08:34:51] [INFO] 🛠️ Modo desarrollo:
+[2025-08-20 08:34:51] [INFO]    - Rate limiting relajado
+[2025-08-20 08:34:51] [INFO]    - Logs detallados habilitados
+[2025-08-20 08:34:51] [INFO]    - Hot reload con nodemon
+[2025-08-20 08:34:51] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 08:34:51] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 08:34:51] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 08:34:51] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 08:34:51] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 08:34:51] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 08:34:51] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 08:34:52] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 08:34:52] [INFO] 🔗 URLs útiles:
+[2025-08-20 08:34:52] [INFO] 📧 Servicio de email configurado
+[2025-08-20 08:34:52] [INFO] 📁 Almacenamiento local configurado
+[2025-08-20 08:34:52] [INFO]    API Base: http://localhost:3001/api
+[2025-08-20 08:34:52] [INFO]    Business: http://localhost:3001/api/business
+[2025-08-20 08:34:52] [INFO]    Services: http://localhost:3001/api/services
+[2025-08-20 08:34:52] [INFO]    Auth: http://localhost:3001/api/auth
+[2025-08-20 08:34:52] [INFO]    Reservations: http://localhost:3001/api/reservations
+[2025-08-20 08:34:52] [INFO]    Documentación: http://localhost:3001/api-docs
+[2025-08-20 08:34:52] [INFO]    Health Check: http://localhost:3001/health
+[2025-08-20 08:34:52] [INFO] 🔧 Comandos útiles:
+[2025-08-20 08:34:52] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 08:34:52] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 08:34:52] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-20 08:34:52] [INFO] 🚀 Servidor ejecutándose en puerto 3001
+[2025-08-20 08:34:52] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 08:34:52] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-20 08:34:52] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-20 08:34:52] [INFO] 🌍 Entorno: undefined
+[2025-08-20 08:34:52] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":6988,"memory":{"rss":101285888,"heapTotal":64770048,"heapUsed":35171128,"external":22321359,"arrayBuffers":18408880}}
+[2025-08-20 08:34:52] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-20 08:34:52] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-20 20:03:13] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 20:03:13] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 20:03:13] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 20:03:13] [INFO] ✅ Configuración JWT válida
+[2025-08-20 20:03:13] [INFO] 📋 Información del entorno:
+[2025-08-20 20:03:13] [INFO]    Entorno: development
+[2025-08-20 20:03:13] [INFO]    Puerto: 3001
+[2025-08-20 20:03:13] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 20:03:13] [INFO] 🛠️ Modo desarrollo:
+[2025-08-20 20:03:13] [INFO]    - CORS permisivo habilitado
+[2025-08-20 20:03:13] [INFO]    - Rate limiting relajado
+[2025-08-20 20:03:13] [INFO]    - Logs detallados habilitados
+[2025-08-20 20:03:13] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 20:03:13] [INFO]    - Hot reload con nodemon
+[2025-08-20 20:03:15] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 20:03:15] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 20:03:15] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 20:03:15] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 20:03:15] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 20:03:15] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 20:03:19] [INFO] 📧 Servicio de email configurado
+[2025-08-20 20:03:19] [INFO] 🔗 URLs útiles:
+[2025-08-20 20:03:19] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 20:03:19] [INFO]    API Base: http://localhost:3001/api
+[2025-08-20 20:03:19] [INFO] 📁 Almacenamiento local configurado
+[2025-08-20 20:03:19] [INFO]    Auth: http://localhost:3001/api/auth
+[2025-08-20 20:03:19] [INFO]    Services: http://localhost:3001/api/services
+[2025-08-20 20:03:19] [INFO]    Reservations: http://localhost:3001/api/reservations
+[2025-08-20 20:03:19] [INFO]    Documentación: http://localhost:3001/api-docs
+[2025-08-20 20:03:19] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 20:03:19] [INFO] 🔧 Comandos útiles:
+[2025-08-20 20:03:19] [INFO]    Health Check: http://localhost:3001/health
+[2025-08-20 20:03:19] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 20:03:19] [INFO]    npm test        - Ejecutar tests (cuando estén configurados)
+[2025-08-20 20:03:19] [INFO]    npm run lint    - Verificar código (cuando esté configurado)
+[2025-08-20 20:03:19] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 20:03:19] [INFO] 🚀 Servidor ejecutándose en puerto 3001
+[2025-08-20 20:03:19] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-20 20:03:19] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-20 20:03:19] [INFO] 🌍 Entorno: undefined
+[2025-08-20 20:03:19] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":27176,"memory":{"rss":100450304,"heapTotal":64770048,"heapUsed":35111296,"external":22318959,"arrayBuffers":18406480}}
+[2025-08-20 20:03:19] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-20 20:03:19] [INFO]    Business: http://localhost:3001/api/business
+[2025-08-20 20:20:58] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 20:20:58] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 20:20:58] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 20:20:58] [INFO] ✅ Configuración JWT válida
+[2025-08-20 20:20:58] [INFO] 📋 Información del entorno:
+[2025-08-20 20:20:58] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 20:20:58] [INFO]    Puerto: 3001
+[2025-08-20 20:20:58] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 20:20:58] [INFO] 🛠️ Modo desarrollo: CORS permisivo, logs detallados, hot reload
+[2025-08-20 20:20:58] [INFO]    Entorno: development
+[2025-08-20 20:20:58] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 20:20:58] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 20:20:58] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 20:20:58] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 20:20:58] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 20:20:58] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 20:21:00] [INFO] 📧 Servicio de email configurado
+[2025-08-20 20:21:00] [INFO] 📁 Almacenamiento local configurado
+[2025-08-20 20:21:00] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 20:21:00] [INFO]    API Base: http://localhost:3001/api
+[2025-08-20 20:21:00] [INFO]    Auth: http://localhost:3001/api/auth
+[2025-08-20 20:21:00] [INFO]    Business: http://localhost:3001/api/business
+[2025-08-20 20:21:00] [INFO]    Reservations: http://localhost:3001/api/reservations
+[2025-08-20 20:21:00] [INFO]    Services: http://localhost:3001/api/services
+[2025-08-20 20:21:00] [INFO]    Documentación: http://localhost:3001/api-docs
+[2025-08-20 20:21:00] [INFO]    Health Check: http://localhost:3001/health
+[2025-08-20 20:21:00] [INFO] 🔧 Comandos útiles:
+[2025-08-20 20:21:00] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 20:21:00] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 20:21:00] [INFO]    npm run lint    - Linting
+[2025-08-20 20:21:00] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 20:21:00] [INFO] 🔗 URLs útiles:
+[2025-08-20 20:21:01] [INFO] 📖 Documentación: http://localhost:undefined/api-docs
+[2025-08-20 20:21:00] [INFO]    npm test        - Ejecutar tests
+[2025-08-20 20:21:01] [INFO] 🏥 Health check: http://localhost:undefined/health
+[2025-08-20 20:21:01] [INFO] 🚀 Servidor ejecutándose en puerto 3001
+[2025-08-20 20:21:01] [INFO] 🌍 Entorno: undefined
+[2025-08-20 20:21:01] [INFO] 🔗 API Base: http://localhost:undefined/api
+[2025-08-20 20:21:01] [INFO] SUCCESS: Server started on port undefined | {"environment":"development","pid":14072,"memory":{"rss":99713024,"heapTotal":65556480,"heapUsed":35061248,"external":22318759,"arrayBuffers":18406280}}
+[2025-08-20 20:26:00] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-20 20:26:00] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-20 20:26:00] [INFO] ✅ Configuración JWT válida
+[2025-08-20 20:26:00] [INFO] ✅ Variables de entorno verificadas
+[2025-08-20 20:26:00] [INFO] 📋 Información del entorno:
+[2025-08-20 20:26:00] [INFO]    Entorno: development
+[2025-08-20 20:26:00] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-20 20:26:00] [INFO]    Puerto: 3001
+[2025-08-20 20:26:00] [INFO] 🛠️ Modo desarrollo: CORS permisivo, logs detallados, hot reload
+[2025-08-20 20:26:00] [INFO] 📦 Cargando aplicación Express...
+[2025-08-20 20:26:01] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-20 20:26:01] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-20 20:26:01] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-20 20:26:01] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-20 20:26:01] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-20 20:26:01] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-20 20:26:01] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-20 20:26:01] [INFO] 🔗 URLs útiles:
+[2025-08-20 20:26:01] [INFO]    API Base: http://localhost:3001/api
+[2025-08-20 20:26:01] [INFO]    Auth: http://localhost:3001/api/auth
+[2025-08-20 20:26:01] [INFO]    Business: http://localhost:3001/api/business
+[2025-08-20 20:26:01] [INFO]    Reservations: http://localhost:3001/api/reservations
+[2025-08-20 20:26:01] [INFO]    Documentación: http://localhost:3001/api-docs
+[2025-08-20 20:26:01] [INFO] 🔧 Comandos útiles:
+[2025-08-20 20:26:01] [INFO]    Health Check: http://localhost:3001/health
+[2025-08-20 20:26:01] [INFO]    npm start       - Iniciar en producción
+[2025-08-20 20:26:01] [INFO]    Services: http://localhost:3001/api/services
+[2025-08-20 20:26:01] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-20 20:26:01] [INFO]    npm run lint    - Linting
+[2025-08-20 20:26:01] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-20 20:26:01] [INFO]    npm test        - Ejecutar tests
+[2025-08-20 20:26:01] [INFO] 🚀 Servidor ejecutándose en puerto 3001
+[2025-08-20 20:26:01] [INFO] 📖 Documentación: http://localhost:3001/api-docs
+[2025-08-20 20:26:01] [INFO] 🏥 Health check: http://localhost:3001/health
+[2025-08-20 20:26:01] [INFO] 🌍 Entorno: development
+[2025-08-20 20:26:01] [INFO] 🔗 API Base: http://localhost:3001/api
+[2025-08-20 20:26:01] [INFO] 🐌 Rate limiting relajado para desarrollo
+[2025-08-20 20:26:01] [INFO] 🔧 CORS habilitado para desarrollo
+[2025-08-20 20:26:01] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":28692,"memory":{"rss":93556736,"heapTotal":64876544,"heapUsed":32978208,"external":22270480,"arrayBuffers":18360509}}
+[2025-08-20 20:26:51] [WARN] Client Error | {"message":"Ruta /favicon.ico no encontrada","url":"/favicon.ico","method":"GET","ip":"127.0.0.1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0","userId":"anonymous","timestamp":"2025-08-20T20:26:51.532Z"}
+[2025-08-21 03:14:17] [INFO] ✅ Configuración JWT válida
+[2025-08-21 03:14:17] [INFO] ✅ Variables de entorno verificadas
+[2025-08-21 03:14:17] [INFO] 📋 Información del entorno:
+[2025-08-21 03:14:17] [INFO]    Puerto: 3001
+[2025-08-21 03:14:17] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-21 03:14:17] [INFO]    Entorno: development
+[2025-08-21 03:14:17] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-21 03:14:17] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-21 03:14:17] [INFO] 🛠️ Modo desarrollo: CORS permisivo, logs detallados, hot reload
+[2025-08-21 03:14:17] [INFO] 📦 Cargando aplicación Express...
+[2025-08-21 03:14:19] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-21 03:14:19] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-21 03:14:19] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-21 03:14:19] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-21 03:14:19] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-21 03:14:19] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-21 03:14:19] [INFO] 🔗 URLs útiles:
+[2025-08-21 03:14:19] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-21 03:14:19] [INFO]    API Base: http://localhost:3001/api
+[2025-08-21 03:14:19] [INFO]    Services: http://localhost:3001/api/services
+[2025-08-21 03:14:19] [INFO]    Auth: http://localhost:3001/api/auth
+[2025-08-21 03:14:19] [INFO]    Business: http://localhost:3001/api/business
+[2025-08-21 03:14:19] [INFO]    Reservations: http://localhost:3001/api/reservations
+[2025-08-21 03:14:19] [INFO] 🔧 Comandos útiles:
+[2025-08-21 03:14:19] [INFO]    Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:14:19] [INFO]    npm start       - Iniciar en producción
+[2025-08-21 03:14:19] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-21 03:14:19] [INFO]    npm run lint    - Linting
+[2025-08-21 03:14:19] [INFO]    npm test        - Ejecutar tests
+[2025-08-21 03:14:19] [INFO]    Health Check: http://localhost:3001/health
+[2025-08-21 03:14:19] [INFO] 📖 Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:14:19] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-21 03:14:19] [INFO] 🏥 Health check: http://localhost:3001/health
+[2025-08-21 03:14:19] [INFO] 🚀 Servidor ejecutándose en puerto 3001
+[2025-08-21 03:14:19] [INFO] 🔗 API Base: http://localhost:3001/api
+[2025-08-21 03:14:19] [INFO] 🔧 CORS habilitado para desarrollo
+[2025-08-21 03:14:19] [INFO] 🐌 Rate limiting relajado para desarrollo
+[2025-08-21 03:14:19] [INFO] 🌍 Entorno: development
+[2025-08-21 03:14:19] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":3352,"memory":{"rss":110338048,"heapTotal":69332992,"heapUsed":37337272,"external":22205687,"arrayBuffers":18294548}}
+[2025-08-21 03:14:57] [WARN] Client Error | {"message":"Ruta /docs no encontrada","url":"/docs","method":"GET","ip":"127.0.0.1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0","userId":"anonymous","timestamp":"2025-08-21T03:14:57.172Z"}
+[2025-08-21 03:14:57] [WARN] Client Error | {"message":"Ruta /favicon.ico no encontrada","url":"/favicon.ico","method":"GET","ip":"127.0.0.1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0","userId":"anonymous","timestamp":"2025-08-21T03:14:57.472Z"}
+[2025-08-21 03:16:49] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-21 03:16:49] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-21 03:16:49] [INFO] 📋 Información del entorno:
+[2025-08-21 03:16:49] [INFO] ✅ Variables de entorno verificadas
+[2025-08-21 03:16:49] [INFO]    Entorno: development
+[2025-08-21 03:16:49] [INFO] 📦 Cargando aplicación Express...
+[2025-08-21 03:16:49] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-21 03:16:49] [INFO]    Puerto: 3001
+[2025-08-21 03:16:49] [INFO] 🛠️ Modo desarrollo: CORS permisivo, logs detallados, hot reload
+[2025-08-21 03:16:49] [INFO] ✅ Configuración JWT válida
+[2025-08-21 03:16:49] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-21 03:16:49] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-21 03:16:49] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-21 03:16:49] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-21 03:16:49] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-21 03:16:49] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-21 03:16:49] [INFO] 🔗 URLs útiles:
+[2025-08-21 03:16:49] [INFO]    Auth: http://localhost:3001/api/auth
+[2025-08-21 03:16:49] [INFO]    Services: http://localhost:3001/api/services
+[2025-08-21 03:16:49] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-21 03:16:49] [INFO]    Reservations: http://localhost:3001/api/reservations
+[2025-08-21 03:16:49] [INFO]    Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:16:49] [INFO] 🔧 Comandos útiles:
+[2025-08-21 03:16:49] [INFO]    API Base: http://localhost:3001/api
+[2025-08-21 03:16:49] [INFO]    Health Check: http://localhost:3001/health
+[2025-08-21 03:16:49] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-21 03:16:49] [INFO]    npm start       - Iniciar en producción
+[2025-08-21 03:16:49] [INFO]    npm test        - Ejecutar tests
+[2025-08-21 03:16:49] [INFO]    Business: http://localhost:3001/api/business
+[2025-08-21 03:16:49] [INFO]    npm run lint    - Linting
+[2025-08-21 03:16:49] [INFO] 🚀 Servidor ejecutándose en puerto 3001
+[2025-08-21 03:16:49] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-21 03:16:49] [INFO] 📖 Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:16:49] [INFO] 🔗 API Base: http://localhost:3001/api
+[2025-08-21 03:16:49] [INFO] 🏥 Health check: http://localhost:3001/health
+[2025-08-21 03:16:49] [INFO] 🔧 CORS habilitado para desarrollo
+[2025-08-21 03:16:49] [INFO] 🌍 Entorno: development
+[2025-08-21 03:16:49] [INFO] 🐌 Rate limiting relajado para desarrollo
+[2025-08-21 03:16:49] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":16904,"memory":{"rss":111554560,"heapTotal":69595136,"heapUsed":36802000,"external":22179730,"arrayBuffers":18268591}}
+[2025-08-21 03:16:57] [WARN] Client Error | {"message":"Ruta /docs no encontrada","url":"/docs","method":"GET","ip":"127.0.0.1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0","userId":"anonymous","timestamp":"2025-08-21T03:16:57.777Z"}
+[2025-08-21 03:20:28] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-21 03:20:28] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-21 03:20:28] [INFO] ✅ Configuración JWT válida
+[2025-08-21 03:20:28] [INFO] ✅ Variables de entorno verificadas
+[2025-08-21 03:20:28] [INFO] 📋 Información del entorno:
+[2025-08-21 03:20:28] [INFO]    Entorno: development
+[2025-08-21 03:20:28] [INFO]    Puerto: 3001
+[2025-08-21 03:20:28] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-21 03:20:28] [INFO] 🛠️ Modo desarrollo: CORS permisivo, logs detallados, hot reload
+[2025-08-21 03:20:28] [INFO] 📦 Cargando aplicación Express...
+[2025-08-21 03:20:29] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-21 03:20:29] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-21 03:20:29] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-21 03:20:29] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-21 03:20:29] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-21 03:20:29] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-21 03:20:29] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-21 03:20:29] [INFO]    Auth: http://localhost:3001/api/auth
+[2025-08-21 03:20:29] [INFO]    Services: http://localhost:3001/api/services
+[2025-08-21 03:20:29] [INFO]    Business: http://localhost:3001/api/business
+[2025-08-21 03:20:29] [INFO]    Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:20:29] [INFO]    Reservations: http://localhost:3001/api/reservations
+[2025-08-21 03:20:29] [INFO]    API Base: http://localhost:3001/api
+[2025-08-21 03:20:29] [INFO]    npm start       - Iniciar en producción
+[2025-08-21 03:20:29] [INFO]    Health Check: http://localhost:3001/health
+[2025-08-21 03:20:29] [INFO]    npm test        - Ejecutar tests
+[2025-08-21 03:20:29] [INFO]    npm run lint    - Linting
+[2025-08-21 03:20:29] [INFO] 🚀 Servidor ejecutándose en puerto 3001
+[2025-08-21 03:20:29] [INFO] 📖 Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:20:29] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-21 03:20:29] [INFO] 🏥 Health check: http://localhost:3001/health
+[2025-08-21 03:20:29] [INFO] 🔧 Comandos útiles:
+[2025-08-21 03:20:29] [INFO] 🐌 Rate limiting relajado para desarrollo
+[2025-08-21 03:20:29] [INFO] 🔧 CORS habilitado para desarrollo
+[2025-08-21 03:20:29] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":11580,"memory":{"rss":111931392,"heapTotal":69857280,"heapUsed":36712792,"external":22179730,"arrayBuffers":18268591}}
+[2025-08-21 03:20:29] [INFO] 🔗 URLs útiles:
+[2025-08-21 03:20:29] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-21 03:20:29] [INFO] 🔗 API Base: http://localhost:3001/api
+[2025-08-21 03:20:29] [INFO] 🌍 Entorno: development
+[2025-08-21 03:21:51] [WARN] Client Error | {"message":"Ruta /api-docs no encontrada","url":"/api-docs","method":"GET","ip":"127.0.0.1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0","userId":"anonymous","timestamp":"2025-08-21T03:21:51.255Z"}
+[2025-08-21 03:24:49] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-21 03:24:49] [INFO] ✅ Variables de entorno verificadas
+[2025-08-21 03:24:49] [INFO] ✅ Configuración JWT válida
+[2025-08-21 03:24:49] [INFO] 📋 Información del entorno:
+[2025-08-21 03:24:49] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-21 03:24:49] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-21 03:24:49] [INFO]    Entorno: development
+[2025-08-21 03:24:49] [INFO] 🛠️ Modo desarrollo: CORS permisivo, logs detallados, hot reload
+[2025-08-21 03:24:49] [INFO] 📦 Cargando aplicación Express...
+[2025-08-21 03:24:49] [INFO]    Puerto: 3001
+[2025-08-21 03:24:50] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-21 03:24:50] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-21 03:24:50] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-21 03:24:50] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-21 03:24:50] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-21 03:24:50] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-21 03:24:50] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-21 03:24:50] [INFO]    API Base: http://localhost:3001/api
+[2025-08-21 03:24:50] [INFO] 🔗 URLs útiles:
+[2025-08-21 03:24:50] [INFO]    Auth: http://localhost:3001/api/auth
+[2025-08-21 03:24:50] [INFO]    Business: http://localhost:3001/api/business
+[2025-08-21 03:24:50] [INFO]    Reservations: http://localhost:3001/api/reservations
+[2025-08-21 03:24:50] [INFO]    Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:24:50] [INFO]    Services: http://localhost:3001/api/services
+[2025-08-21 03:24:50] [INFO]    Health Check: http://localhost:3001/health
+[2025-08-21 03:24:50] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-21 03:24:50] [INFO] 🔧 Comandos útiles:
+[2025-08-21 03:24:50] [INFO]    npm start       - Iniciar en producción
+[2025-08-21 03:24:50] [INFO]    npm test        - Ejecutar tests
+[2025-08-21 03:24:50] [INFO]    npm run lint    - Linting
+[2025-08-21 03:24:50] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-21 03:24:50] [INFO] 🚀 Servidor ejecutándose en puerto 3001
+[2025-08-21 03:24:50] [INFO] 🏥 Health check: http://localhost:3001/health
+[2025-08-21 03:24:50] [INFO] 📖 Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:24:50] [INFO] 🌍 Entorno: development
+[2025-08-21 03:24:50] [INFO] 🔗 API Base: http://localhost:3001/api
+[2025-08-21 03:24:50] [INFO] 🔧 CORS habilitado para desarrollo
+[2025-08-21 03:24:50] [INFO] 🐌 Rate limiting relajado para desarrollo
+[2025-08-21 03:24:50] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":24116,"memory":{"rss":111636480,"heapTotal":70119424,"heapUsed":36693464,"external":22179730,"arrayBuffers":18268591}}
+[2025-08-21 03:48:22] [WARN] Client Error | {"message":"Ruta /auth/resend-verification no encontrada","url":"/auth/resend-verification","method":"POST","ip":"127.0.0.1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0","userId":"anonymous","timestamp":"2025-08-21T03:48:22.603Z"}
+[2025-08-21 03:49:30] [WARN] Client Error | {"message":"Ruta /auth/register no encontrada","url":"/auth/register","method":"POST","ip":"127.0.0.1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0","userId":"anonymous","timestamp":"2025-08-21T03:49:30.862Z"}
+[2025-08-21 03:50:03] [WARN] Client Error | {"message":"Ruta /upload/file no encontrada","url":"/upload/file","method":"POST","ip":"127.0.0.1","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.0.0.0","userId":"anonymous","timestamp":"2025-08-21T03:50:03.846Z"}
+[2025-08-21 03:54:37] [INFO] 🚀 Iniciando MiSitioFácil Backend...
+[2025-08-21 03:54:37] [INFO] ✅ Configuración JWT válida
+[2025-08-21 03:54:37] [INFO] ✅ Node.js v20.12.1 - Compatible
+[2025-08-21 03:54:37] [INFO] ✅ Variables de entorno verificadas
+[2025-08-21 03:54:37] [INFO] 📋 Información del entorno:
+[2025-08-21 03:54:37] [INFO]    Entorno: development
+[2025-08-21 03:54:37] [INFO]    Puerto: 3001
+[2025-08-21 03:54:37] [INFO]    Base de datos: mongodb+srv://***:***@cluster0.96dvgx4.mongodb.net/misitiofacil?retryWrites=true&w=majority&appName=Cluster0
+[2025-08-21 03:54:37] [INFO] 📦 Cargando aplicación Express...
+[2025-08-21 03:54:37] [INFO] 🛠️ Modo desarrollo: CORS permisivo, logs detallados, hot reload
+[2025-08-21 03:54:38] [INFO] ✅ Rutas de autenticación cargadas
+[2025-08-21 03:54:38] [INFO] ✅ Rutas de usuarios cargadas
+[2025-08-21 03:54:38] [INFO] ✅ Rutas de negocios cargadas
+[2025-08-21 03:54:38] [INFO] ✅ Rutas de servicios cargadas
+[2025-08-21 03:54:38] [INFO] 🔌 Iniciando servidor HTTP...
+[2025-08-21 03:54:38] [INFO] ✅ Rutas de plantillas cargadas
+[2025-08-21 03:54:38] [INFO] ✅ Servidor iniciado exitosamente
+[2025-08-21 03:54:38] [INFO]    API Base: http://localhost:3001/api
+[2025-08-21 03:54:38] [INFO] 🔗 URLs útiles:
+[2025-08-21 03:54:38] [INFO]    Auth: http://localhost:3001/api/auth
+[2025-08-21 03:54:38] [INFO]    Services: http://localhost:3001/api/services
+[2025-08-21 03:54:38] [INFO]    Business: http://localhost:3001/api/business
+[2025-08-21 03:54:38] [INFO]    Reservations: http://localhost:3001/api/reservations
+[2025-08-21 03:54:38] [INFO]    Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:54:38] [INFO]    Health Check: http://localhost:3001/health
+[2025-08-21 03:54:38] [INFO] 🔧 Comandos útiles:
+[2025-08-21 03:54:38] [INFO]    npm run dev     - Modo desarrollo con hot reload
+[2025-08-21 03:54:38] [INFO]    npm start       - Iniciar en producción
+[2025-08-21 03:54:38] [INFO]    npm test        - Ejecutar tests
+[2025-08-21 03:54:38] [INFO] 🎉 ¡MiSitioFácil Backend está listo para recibir requests!
+[2025-08-21 03:54:38] [INFO]    npm run lint    - Linting
+[2025-08-21 03:54:38] [INFO] 🚀 Servidor ejecutándose en puerto 3001
+[2025-08-21 03:54:38] [INFO] 📖 Documentación: http://localhost:3001/api-docs
+[2025-08-21 03:54:38] [INFO] 🏥 Health check: http://localhost:3001/health
+[2025-08-21 03:54:38] [INFO] 🔧 CORS habilitado para desarrollo
+[2025-08-21 03:54:38] [INFO] 🔗 API Base: http://localhost:3001/api
+[2025-08-21 03:54:38] [INFO] 🐌 Rate limiting relajado para desarrollo
+[2025-08-21 03:54:38] [INFO] 🌍 Entorno: development
+[2025-08-21 03:54:38] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":27920,"memory":{"rss":110473216,"heapTotal":69595136,"heapUsed":37596472,"external":22205687,"arrayBuffers":18294548}}

@@ -2,23 +2,22 @@
 import express from 'express';
 import authController from '../controllers/auth.controller.js';
 
-// ✅ AGREGAR: Importaciones de middleware de seguridad
+// ✅ IMPORTACIONES CORREGIDAS - sin duplicados
 import { 
   apiSecurityMiddleware,
   authRateLimit,
   generalRateLimit 
 } from '../middleware/security.js';
 
-// ✅ AGREGAR: Importaciones de middleware de sanitización
 import { 
   sanitizeUserData 
 } from '../middleware/index.js';
 
-const router = express.Router();
-
-// ✅ CREAR: Rate limiting personalizado para este router
+// ✅ CREAR los alias una sola vez
 const rateLimitStrict = generalRateLimit;
 const rateLimitAuth = authRateLimit;
+
+const router = express.Router();
 
 /**
  * @swagger
@@ -117,7 +116,7 @@ const rateLimitAuth = authRateLimit;
  *           format: date-time
  */
 
-// ✅ APLICAR: Seguridad para autenticación (ahora funciona)
+// ✅ Aplicar seguridad para autenticación
 router.use(apiSecurityMiddleware);
 
 /**
@@ -298,7 +297,7 @@ router.post('/refresh-token',
  */
 router.post('/forgot-password', 
   rateLimitStrict, 
-  authController.requestPasswordReset  // ✅ CORREGIDO: nombre del método
+  authController.requestPasswordReset  // ✅ MÉTODO CORRECTO
 );
 
 /**
@@ -368,9 +367,8 @@ router.post('/reset-password',
  */
 router.post('/verify-email', 
   rateLimitStrict, 
-  // ✅ TEMPORAL: Comentado hasta implementar
-  (req, res) => res.status(501).json({ error: 'No implementado aún' })
-  // authController.verifyEmail
+  // ✅ TEMPORAL: función placeholder hasta implementar
+  (req, res) => res.status(501).json({ error: 'Función no implementada aún' })
 );
 
 /**
@@ -402,9 +400,8 @@ router.post('/verify-email',
  */
 router.post('/resend-verification', 
   rateLimitStrict, 
-  // ✅ TEMPORAL: Comentado hasta implementar
-  (req, res) => res.status(501).json({ error: 'No implementado aún' })
-  // authController.resendVerification
+  // ✅ TEMPORAL: función placeholder hasta implementar
+  (req, res) => res.status(501).json({ error: 'Función no implementada aún' })
 );
 
 export default router;
