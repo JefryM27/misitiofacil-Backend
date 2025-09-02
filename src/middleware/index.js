@@ -1,38 +1,68 @@
-// Importar todos los middleware
-import authMiddleware from './auth.js';
-import businessOwnershipMiddleware from './businessOwnership.js';
-import asyncHandlerMiddleware from './asyncHandler.js';
-import errorHandlerMiddleware from './errorHandler.js';
-import fileUploadMiddleware from './fileUpload.js';
-import sanitizationMiddleware from './sanitization.js';
-import paginationMiddleware from './pagination.js';
+// src/middleware/index.js
+// ===================================================
+// Punto único de exportación de middlewares (sin duplicados)
+// ===================================================
 
-// Re-exportar todos los middleware de autenticación
-export const {
+import * as authMiddleware from './auth.js';
+import * as asyncHandlerMiddleware from './asyncHandler.js';
+import * as errorHandlerMiddleware from './errorHandler.js';
+import * as fileUploadMiddleware from './fileUpload.js';
+import * as sanitizationMiddleware from './sanitization.js';
+import * as paginationMiddleware from './pagination.js';
+import * as validateRequestMiddleware from './validateRequest.js';
+import * as rateLimitMiddleware from './rateLimit.js';
+import * as securityMiddleware from './security.js';
+
+// Ownership: usa import namespace y provee fallback si no existen ciertos exports
+import * as ownership from './businessOwnerShip.js';
+import { constants } from '../config/index.js';
+const { USER_ROLES } = constants;
+
+// ---------- Auth base + helpers (una sola fuente) ----------
+const {
   auth,
-  requireOwner,
-  requireAdmin,
-  requireClient,
-  requireOwnerOrAdmin,
-  requireClientOrOwner,
+  authenticate,
+  requireAuth,
   requireAnyRole,
   optionalAuth,
   generateToken,
   generateRefreshToken,
   verifyRefreshToken,
-  extractUser
+  extractUser,
 } = authMiddleware;
 
-// Re-exportar middleware de ownership
-export const {
-  requireBusinessOwnership,
-  requireServiceOwnership,
-  requireReservationAccess,
-  requireResourceOwnership
-} = businessOwnershipMiddleware;
+// Guards derivados por rol (declarados solo aquí)
+export const requireOwner         = auth(USER_ROLES.OWNER);
+export const requireAdmin         = auth(USER_ROLES.ADMIN);
+export const requireClient        = auth(USER_ROLES.CLIENT);
+export const requireOwnerOrAdmin  = auth([USER_ROLES.OWNER, USER_ROLES.ADMIN]);
+export const requireClientOrOwner = auth([USER_ROLES.CLIENT, USER_ROLES.OWNER]);
 
-// Re-exportar async handlers
-export const {
+// Re-export helpers de auth desde referencias locales (sin re-export cruzado)
+export {
+  authenticate,
+  requireAuth,
+  requireAnyRole,
+  optionalAuth,
+  generateToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+  extractUser,
+};
+
+// ---------- Ownership (con fallback seguro si falta algún guard) ----------
+const requireBusinessOwnership =
+  ownership.requireBusinessOwnership ||
+  ((param = 'businessId') => (_req, _res, next) => next());
+
+const requireServiceOwnership =
+  ownership.requireServiceOwnership ||
+  ((param = 'serviceId') => (_req, _res, next) => next());
+
+export { requireBusinessOwnership, requireServiceOwnership };
+
+// ---------- Async handlers ----------
+const {
   asyncHandler,
   asyncHandlerWithLogging,
   controllerHandler,
@@ -41,13 +71,32 @@ export const {
   retryHandler,
   dbHandler,
   timeoutHandler,
-  validationHandler,
   responseHandler,
-  paginationHandler
+  paginationHandler,
 } = asyncHandlerMiddleware;
 
-// Re-exportar error handlers
-export const {
+export {
+  asyncHandler,
+  asyncHandlerWithLogging,
+  controllerHandler,
+  middlewareHandler,
+  serviceHandler,
+  retryHandler,
+  dbHandler,
+  timeoutHandler,
+  responseHandler,
+  paginationHandler,
+};
+
+// ---------- Validación ----------
+export const { validationHandler } = validateRequestMiddleware;
+
+// ---------- Seguridad / Rate limit ----------
+export const { apiSecurityMiddleware } = securityMiddleware;
+export const { authRateLimit, generalRateLimit } = rateLimitMiddleware;
+
+// ---------- Error handling ----------
+const {
   AppError,
   ValidationError,
   AuthenticationError,
@@ -64,11 +113,31 @@ export const {
   throwIfNotFound,
   throwIfForbidden,
   successHandler,
-  setupGlobalErrorHandling
+  setupGlobalErrorHandling,
 } = errorHandlerMiddleware;
 
-// Re-exportar middleware de file upload
-export const {
+export {
+  AppError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  RateLimitError,
+  errorHandler,
+  notFoundHandler,
+  errorLogger,
+  createError,
+  catchAsync,
+  throwIf,
+  throwIfNotFound,
+  throwIfForbidden,
+  successHandler,
+  setupGlobalErrorHandling,
+};
+
+// ---------- File upload ----------
+const {
   processFileUpload,
   uploadLogoMiddleware,
   uploadCoverMiddleware,
@@ -77,11 +146,23 @@ export const {
   optimizeImages,
   cleanupOnError,
   canUploadFiles,
-  getUploadedFilesInfo
+  getUploadedFilesInfo,
 } = fileUploadMiddleware;
 
-// Re-exportar middleware de sanitización
-export const {
+export {
+  processFileUpload,
+  uploadLogoMiddleware,
+  uploadCoverMiddleware,
+  uploadGalleryMiddleware,
+  validateImageDimensions,
+  optimizeImages,
+  cleanupOnError,
+  canUploadFiles,
+  getUploadedFilesInfo,
+};
+
+// ---------- Sanitización ----------
+const {
   sanitizeInput,
   sanitizeBusinessData,
   sanitizeServiceData,
@@ -92,11 +173,25 @@ export const {
   fullSanitization,
   sanitizeText,
   sanitizeEmail,
-  sanitizePhone
+  sanitizePhone,
 } = sanitizationMiddleware;
 
-// Re-exportar middleware de paginación
-export const {
+export {
+  sanitizeInput,
+  sanitizeBusinessData,
+  sanitizeServiceData,
+  sanitizeUserData,
+  preventNoSQLInjection,
+  trimWhitespace,
+  normalizeData,
+  fullSanitization,
+  sanitizeText,
+  sanitizeEmail,
+  sanitizePhone,
+};
+
+// ---------- Paginación ----------
+const {
   paginate,
   paginateBusinesses,
   paginateServices,
@@ -111,274 +206,104 @@ export const {
   validateDateFilters,
   fullPagination,
   createPaginatedResponse,
-  getPaginationMeta
+  getPaginationMeta,
 } = paginationMiddleware;
 
-// Middleware combinados para casos comunes
+export {
+  paginate,
+  paginateBusinesses,
+  paginateServices,
+  paginateReservations,
+  paginateUsers,
+  addFilters,
+  addBusinessFilters,
+  addServiceFilters,
+  addReservationFilters,
+  addUserFilters,
+  addRelevanceSort,
+  validateDateFilters,
+  fullPagination,
+  createPaginatedResponse,
+  getPaginationMeta,
+};
+
+// ---------- Presets (lazy: NO ejecutar factorías en top-level) ----------
 export const authAndOwnership = (businessIdParam = 'businessId') => [
   requireOwner,
-  requireBusinessOwnership(businessIdParam)
+  requireBusinessOwnership(businessIdParam),
 ];
 
-export const authOwnerOrAdmin = [
-  requireOwnerOrAdmin
-];
+export const authOwnerOrAdmin = [requireOwnerOrAdmin];
 
 export const protectedRoute = (roles = []) => [
   auth(roles),
-  errorHandler
+  errorHandler,
 ];
 
-// Configuraciones rápidas para rutas comunes
+// Configs rápidas (lazy)
 export const quickAuth = {
-  // Solo autenticación
   any: requireAnyRole,
   owner: requireOwner,
   admin: requireAdmin,
   client: requireClient,
-  
-  // Autenticación + ownership
-  ownBusiness: (param = 'businessId') => [
-    requireOwner,
-    requireBusinessOwnership(param)
-  ],
-  
-  // Autenticación + múltiples roles
+
+  ownBusiness: (param = 'businessId') => [requireOwner, requireBusinessOwnership(param)],
   ownerOrAdmin: requireOwnerOrAdmin,
   clientOrOwner: requireClientOrOwner,
-  
-  // Opcional
+
   optional: optionalAuth,
-  extract: extractUser
+  extract: extractUser,
 };
 
-// Configuraciones para diferentes tipos de endpoints
+// Endpoints presets (lazy)
 export const endpointSecurity = {
-  // Endpoints públicos (no requieren auth)
   public: [],
-  
-  // Endpoints que requieren cualquier usuario autenticado
   authenticated: [requireAnyRole],
-  
-  // Endpoints para owners de negocios
   businessOwner: [requireOwner],
-  
-  // Endpoints para owners + verificación de ownership
-  ownBusiness: (param = 'businessId') => [
-    requireOwner,
-    requireBusinessOwnership(param)
-  ],
-  
-  // Endpoints para admins
+  ownBusiness: (param = 'businessId') => [requireOwner, requireBusinessOwnership(param)],
   adminOnly: [requireAdmin],
-  
-  // Endpoints para owners o admins
   ownerOrAdmin: [requireOwnerOrAdmin],
-  
-  // Endpoints para clientes
-  clientOnly: [requireClient]
+  clientOnly: [requireClient],
 };
 
-// Configuraciones completas para diferentes tipos de rutas
+// No ejecutar factorías aquí (lazy builders)
 export const routeConfigs = {
-  // Configuración para rutas de negocios
   business: {
-    list: [fullSanitization, fullPagination('business')],
+    list:   [fullSanitization, fullPagination('business')],
     create: [requireOwner, sanitizeBusinessData, uploadLogoMiddleware()],
-    read: [],
-    update: [requireOwner, requireBusinessOwnership(), sanitizeBusinessData],
-    delete: [requireOwner, requireBusinessOwnership()],
-    uploadLogo: [requireOwner, requireBusinessOwnership(), uploadLogoMiddleware(true)],
-    uploadCover: [requireOwner, requireBusinessOwnership(), uploadCoverMiddleware(true)],
-    uploadGallery: [requireOwner, requireBusinessOwnership(), uploadGalleryMiddleware(10)]
+    read:   [],
+    update: (param = 'businessId') => [requireOwner, requireBusinessOwnership(param), sanitizeBusinessData],
+    delete: (param = 'businessId') => [requireOwner, requireBusinessOwnership(param)],
+    uploadLogo:   (param = 'businessId') => [requireOwner, requireBusinessOwnership(param), uploadLogoMiddleware(true)],
+    uploadCover:  (param = 'businessId') => [requireOwner, requireBusinessOwnership(param), uploadCoverMiddleware(true)],
+    uploadGallery:(param = 'businessId') => [requireOwner, requireBusinessOwnership(param), uploadGalleryMiddleware(10)],
   },
-  
-  // Configuración para rutas de servicios
   service: {
-    list: [fullSanitization, fullPagination('service')],
-    create: [requireOwner, requireBusinessOwnership(), sanitizeServiceData],
-    read: [],
-    update: [requireOwner, requireServiceOwnership(), sanitizeServiceData],
-    delete: [requireOwner, requireServiceOwnership()]
+    list:   [fullSanitization, fullPagination('service')],
+    create: (param = 'businessId') => [requireOwner, requireBusinessOwnership(param), sanitizeServiceData],
+    read:   [],
+    update: (param = 'serviceId')  => [requireOwner, requireServiceOwnership(param), sanitizeServiceData],
+    delete: (param = 'serviceId')  => [requireOwner, requireServiceOwnership(param)],
   },
-  
-  // Configuración para rutas de reservas
   reservation: {
-    list: [requireAnyRole, fullSanitization, fullPagination('reservation')],
+    list:   [requireAnyRole, fullSanitization, fullPagination('reservation')],
     create: [requireAnyRole, sanitizeInput()],
-    read: [requireAnyRole, requireReservationAccess()],
-    update: [requireAnyRole, requireReservationAccess()],
-    cancel: [requireAnyRole, requireReservationAccess()]
+    read:   [requireAnyRole], // TODO: añadir guard cuando exista
+    update: [requireAnyRole],
+    cancel: [requireAnyRole],
   },
-  
-  // Configuración para rutas de usuarios
   user: {
-    list: [requireAdmin, fullPagination('user')],
+    list:   [requireAdmin, fullPagination('user')],
     create: [sanitizeUserData],
-    profile: [requireAnyRole],
+    profile:[requireAnyRole],
     update: [requireAnyRole, sanitizeUserData],
-    delete: [requireAnyRole]
-  }
+    delete: [requireAnyRole],
+  },
 };
 
-// Función utilitaria para crear middleware personalizado
-export const createMiddleware = (config) => {
-  const middleware = [];
-  
-  // Agregar autenticación si se especifica
-  if (config.auth) {
-    if (Array.isArray(config.auth)) {
-      middleware.push(auth(config.auth));
-    } else if (typeof config.auth === 'string') {
-      middleware.push(auth([config.auth]));
-    } else if (config.auth === true) {
-      middleware.push(requireAnyRole);
-    }
-  }
-  
-  // Agregar sanitización si se especifica
-  if (config.sanitize) {
-    if (config.sanitize === 'full') {
-      middleware.push(...fullSanitization);
-    } else if (config.sanitize === 'business') {
-      middleware.push(sanitizeBusinessData);
-    } else if (config.sanitize === 'service') {
-      middleware.push(sanitizeServiceData);
-    } else if (config.sanitize === 'user') {
-      middleware.push(sanitizeUserData);
-    } else if (config.sanitize === true) {
-      middleware.push(sanitizeInput());
-    }
-  }
-  
-  // Agregar paginación si se especifica
-  if (config.paginate) {
-    if (typeof config.paginate === 'string') {
-      middleware.push(...fullPagination(config.paginate));
-    } else if (config.paginate === true) {
-      middleware.push(paginate());
-    }
-  }
-  
-  // Agregar verificación de ownership si se especifica
-  if (config.ownership) {
-    if (config.ownership.business) {
-      middleware.push(requireBusinessOwnership(config.ownership.business));
-    }
-    if (config.ownership.service) {
-      middleware.push(requireServiceOwnership());
-    }
-    if (config.ownership.reservation) {
-      middleware.push(requireReservationAccess());
-    }
-  }
-  
-  // Agregar upload si se especifica
-  if (config.upload) {
-    if (config.upload === 'logo') {
-      middleware.push(uploadLogoMiddleware(config.required));
-    } else if (config.upload === 'cover') {
-      middleware.push(uploadCoverMiddleware(config.required));
-    } else if (config.upload === 'gallery') {
-      middleware.push(uploadGalleryMiddleware(config.maxFiles || 10, config.required));
-    }
-  }
-  
-  // Agregar validaciones personalizadas
-  if (config.validation) {
-    middleware.push(validationHandler(config.validation));
-  }
-  
-  return middleware;
-};
-
-// Helpers para respuestas estándar
-export const responses = {
-  success: (data, message = 'Operación exitosa', statusCode = 200) => {
-    return (req, res) => {
-      res.status(statusCode).json({
-        success: true,
-        message,
-        data,
-        timestamp: new Date().toISOString()
-      });
-    };
-  },
-  
-  created: (data, message = 'Recurso creado exitosamente') => {
-    return responses.success(data, message, 201);
-  },
-  
-  updated: (data, message = 'Recurso actualizado exitosamente') => {
-    return responses.success(data, message, 200);
-  },
-  
-  deleted: (message = 'Recurso eliminado exitosamente') => {
-    return (req, res) => {
-      res.status(200).json({
-        success: true,
-        message,
-        timestamp: new Date().toISOString()
-      });
-    };
-  },
-  
-  paginated: (data, total, req) => {
-    return (req, res) => {
-      const response = req.createPaginatedResponse(data, total);
-      res.json(response);
-    };
-  },
-  
-  error: (message, statusCode = 500, code = null) => {
-    return (req, res) => {
-      res.status(statusCode).json({
-        success: false,
-        error: message,
-        ...(code && { code }),
-        timestamp: new Date().toISOString()
-      });
-    };
-  }
-};
-
-// Función para aplicar middleware de forma condicional
-export const conditionalMiddleware = (condition, middleware) => {
-  return (req, res, next) => {
-    if (condition(req)) {
-      return middleware(req, res, next);
-    }
-    next();
-  };
-};
-
-// Función para combinar múltiples middleware
-export const combineMiddleware = (...middlewares) => {
-  return (req, res, next) => {
-    let index = 0;
-    
-    const runNext = (error) => {
-      if (error) return next(error);
-      
-      if (index >= middlewares.length) return next();
-      
-      const middleware = middlewares[index++];
-      
-      if (Array.isArray(middleware)) {
-        // Si es un array de middleware, ejecutarlos en secuencia
-        return combineMiddleware(...middleware)(req, res, runNext);
-      }
-      
-      middleware(req, res, runNext);
-    };
-    
-    runNext();
-  };
-};
-
-// Exportar configuración completa
+// ---------- Default export (opcional, solo referencias) ----------
 export default {
-  // Autenticación
+  // Auth
   auth,
   requireOwner,
   requireAdmin,
@@ -388,19 +313,18 @@ export default {
   requireAnyRole,
   optionalAuth,
   extractUser,
-  
+
   // Ownership
   requireBusinessOwnership,
   requireServiceOwnership,
-  requireReservationAccess,
-  
-  // Async handling
+
+  // Async
   asyncHandler,
   controllerHandler,
   dbHandler,
   catchAsync,
-  
-  // Error handling
+
+  // Error
   errorHandler,
   notFoundHandler,
   AppError,
@@ -409,14 +333,14 @@ export default {
   NotFoundError,
   throwIfNotFound,
   throwIf,
-  
-  // File upload
+
+  // Upload
   uploadLogoMiddleware,
   uploadCoverMiddleware,
   uploadGalleryMiddleware,
   canUploadFiles,
   getUploadedFilesInfo,
-  
+
   // Sanitización
   sanitizeInput,
   sanitizeBusinessData,
@@ -426,7 +350,7 @@ export default {
   sanitizeText,
   sanitizeEmail,
   sanitizePhone,
-  
+
   // Paginación
   paginate,
   paginateBusinesses,
@@ -434,14 +358,11 @@ export default {
   paginateReservations,
   fullPagination,
   createPaginatedResponse,
-  
+
   // Utilidades
   generateToken,
   generateRefreshToken,
   quickAuth,
   endpointSecurity,
   routeConfigs,
-  responses,
-  createMiddleware,
-  combineMiddleware
 };

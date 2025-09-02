@@ -1,111 +1,144 @@
+// src/config/database/mongodb.js
+// ─────────────────────────────────────────────────────────────
+// MongoDB connection helper (Mongoose) — serverless friendly
+// - Caches the connection across invocations (Vercel)
+// - Attaches event listeners only once
+// - Safe logging (redacts credentials)
+// ─────────────────────────────────────────────────────────────
+
 import mongoose from 'mongoose';
 
-export const connectMongoDB = async () => {
+const {
+  NODE_ENV,
+  MONGODB_URI,
+  MONGODB_TIMEOUT_MS,
+  MONGODB_MAX_POOL_SIZE,
+  MONGODB_AUTH_SOURCE,          // optional, e.g. 'admin'
+  MONGODB_DEBUG                 // 'true' to enable mongoose debug
+} = process.env;
+
+if (!MONGODB_URI) {
+  throw new Error('MONGODB_URI is required');
+}
+
+// Enable Mongoose debug if requested
+if (MONGODB_DEBUG === 'true' && NODE_ENV !== 'production') {
+  mongoose.set('debug', true);
+}
+
+// Global cache shared across hot reloads / serverless invocations
+let cached = global._mongoose;
+if (!cached) cached = global._mongoose = { conn: null, promise: null };
+
+// Prevent attaching listeners multiple times
+if (!global._mongooseEventsWired) {
+  mongoose.connection.on('connected', () => {
+    console.log('🟢 MongoDB connected');
+  });
+  mongoose.connection.on('error', (err) => {
+    console.error('❌ MongoDB connection error:', err?.message || err);
+  });
+  mongoose.connection.on('disconnected', () => {
+    console.warn('⚠️ MongoDB disconnected');
+  });
+  mongoose.connection.on('reconnected', () => {
+    console.log('🔄 MongoDB reconnected');
+  });
+  global._mongooseEventsWired = true;
+}
+
+/** Redacts credentials in URI for logs */
+function redact(uri) {
   try {
-    console.log('🔗 Intentando conectar a MongoDB...');
-    
-    // ✅ VALIDACIÓN PREVIA
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI no está definida en las variables de entorno');
-    }
-    
-    if (process.env.MONGODB_URI.includes('<db_password>')) {
-      throw new Error('MONGODB_URI contiene <db_password>. Reemplázalo con tu password real');
-    }
-    
-    // ✅ MOSTRAR URI CENSURADA
-    const censoredUri = process.env.MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
-    console.log('📍 URI:', censoredUri);
-    
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: parseInt(process.env.MONGODB_TIMEOUT_MS) || 10000,
-      maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE) || 10,
-      bufferMaxEntries: 0,
-      retryWrites: true,
-      w: 'majority',
-      authSource: 'admin' // ✅ AGREGADO
+    return uri.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@');
+  } catch {
+    return '***';
+  }
+}
+
+/** Build connection options compatible with Mongoose 7+ */
+function buildOptions() {
+  const opts = {
+    serverSelectionTimeoutMS: Number(MONGODB_TIMEOUT_MS || 15000),
+    maxPoolSize: Number(MONGODB_MAX_POOL_SIZE || 10),
+    socketTimeoutMS: 45000,
+    retryWrites: true,
+    w: 'majority'
+  };
+  // Only set authSource if provided; Atlas usually doesn't require overriding it
+  if (MONGODB_AUTH_SOURCE) opts.authSource = MONGODB_AUTH_SOURCE;
+  return opts;
+}
+
+/**
+ * Connects to Mongo once and reuses the connection.
+ * Safe to call multiple times.
+ */
+export async function connectMongoDB() {
+  // Already connected
+  if (cached.conn) return cached.conn;
+
+  // Existing in-flight connect
+  if (!cached.promise) {
+    const options = buildOptions();
+    const safeUri = redact(MONGODB_URI);
+
+    console.log('🔗 Connecting to MongoDB…');
+    console.log('📍 URI:', safeUri);
+    console.log('⚙️  Options:', {
+      serverSelectionTimeoutMS: options.serverSelectionTimeoutMS,
+      maxPoolSize: options.maxPoolSize,
+      socketTimeoutMS: options.socketTimeoutMS,
+      authSource: options.authSource || '(default)'
     });
 
-    console.log(`✅ MongoDB conectado: ${conn.connection.host}`);
-    console.log(`📊 Base de datos: ${conn.connection.name}`);
-    return conn;
-    
-  } catch (err) {
-    // ✅ MOSTRAR ERROR COMPLETO
-    console.error('❌ Error conectando a MongoDB:');
-    console.error('📋 Mensaje:', err.message);
-    console.error('📋 Código:', err.code);
-    console.error('📋 Nombre:', err.name);
-    
-    // ✅ DIAGNÓSTICO ESPECÍFICO
-    if (err.message.includes('authentication failed') || err.code === 8000) {
-      console.error('💡 PROBLEMA: Credenciales incorrectas');
-      console.error('   1. Ve a MongoDB Atlas → Database Access');
-      console.error('   2. Verifica username/password');
-      console.error('   3. Cambia password si es necesario');
-    }
-    
-    if (err.message.includes('IP address') || err.message.includes('not allowed') || err.code === 8) {
-      console.error('💡 PROBLEMA: IP no autorizada');
-      console.error('   1. Ve a MongoDB Atlas → Network Access');
-      console.error('   2. Agrega tu IP actual');
-      console.error('   3. O agrega 0.0.0.0/0 para desarrollo');
-    }
-    
-    if (err.message.includes('ENOTFOUND') || err.message.includes('getaddrinfo')) {
-      console.error('💡 PROBLEMA: No se puede resolver el host');
-      console.error('   1. Verifica tu conexión a internet');
-      console.error('   2. Verifica que el cluster está activo');
-      console.error('   3. Prueba con otra red');
-    }
-    
-    if (err.message.includes('timeout') || err.name === 'MongoServerSelectionError') {
-      console.error('💡 PROBLEMA: Timeout de conexión');
-      console.error('   1. El cluster puede estar pausado');
-      console.error('   2. Verifica firewall/antivirus');
-      console.error('   3. Aumenta MONGODB_TIMEOUT_MS a 15000');
-    }
-    
-    throw err;
+    cached.promise = mongoose.connect(MONGODB_URI, options).then((m) => {
+      const { host, name } = m.connection;
+      console.log(`✅ MongoDB connected: ${host}`);
+      console.log(`📊 Database: ${name}`);
+      return m;
+    }).catch((err) => {
+      // Rich diagnostics
+      console.error('❌ Error connecting to MongoDB');
+      console.error('📋 Message:', err?.message);
+      console.error('📋 Code:', err?.code);
+      console.error('📋 Name:', err?.name);
+
+      if (err?.message?.toLowerCase?.().includes('authentication failed') || err?.code === 8000) {
+        console.error('💡 Hint: Check Database Access (username/password) in Atlas.');
+      }
+      if ((err?.message || '').match(/ip|not allowed|whitelist/i) || err?.code === 8) {
+        console.error('💡 Hint: Check Network Access (IP allowlist) in Atlas. For dev, 0.0.0.0/0.');
+      }
+      if ((err?.message || '').match(/ENOTFOUND|getaddrinfo/i)) {
+        console.error('💡 Hint: DNS/Connectivity issue. Verify cluster status and network.');
+      }
+      if (err?.name === 'MongoServerSelectionError' || (err?.message || '').includes('timeout')) {
+        console.error('💡 Hint: Server selection timeout. Cluster paused? Firewall? Increase MONGODB_TIMEOUT_MS.');
+      }
+
+      // Reset promise so future calls can retry
+      cached.promise = null;
+      throw err;
+    });
   }
-};
 
-// Manejo de eventos de conexión
-mongoose.connection.on('connected', () => {
-  console.log('🟢 MongoDB conectado exitosamente');
-});
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
 
-mongoose.connection.on('error', (err) => {
-  console.error('❌ Error en conexión MongoDB:', err.message);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('⚠️ MongoDB desconectado');
-});
-
-mongoose.connection.on('reconnected', () => {
-  console.log('🔄 MongoDB reconectado');
-});
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
+/** Closes the connection — useful in tests */
+export async function closeMongoDB() {
   try {
-    await mongoose.connection.close();
-    console.log('🔒 Conexión MongoDB cerrada por terminación de aplicación');
-  } catch (err) {
-    console.error('❌ Error cerrando conexión MongoDB:', err);
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+      cached.conn = null;
+      cached.promise = null;
+      console.log('✅ MongoDB connection closed');
+    }
+  } catch (e) {
+    console.warn('⚠️ Error while closing MongoDB:', e?.message || e);
   }
-});
-
-process.on('SIGTERM', async () => {
-  try {
-    await mongoose.connection.close();
-    console.log('🔒 Conexión MongoDB cerrada por SIGTERM');
-  } catch (err) {
-    console.error('❌ Error cerrando conexión MongoDB:', err);
-  }
-});
+}
 
 export default connectMongoDB;

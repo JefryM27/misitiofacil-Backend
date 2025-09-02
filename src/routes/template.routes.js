@@ -1,13 +1,16 @@
-// routes/template.routes.js
+// routes/template.routes.js - Con controlador real
 import express from 'express';
-import templateController from '../controllers/template.controller.js'; // ✅ Sin destructuring
 
-// ✅ IMPORTACIONES DE MIDDLEWARE
+// Importar el controlador real
+import templateController from '../controllers/template.controller.js';
+
+// ✅ IMPORTACIONES DE MIDDLEWARE - Usando tu estructura actual
 import { 
   requireOwner,
   requireOwnerOrAdmin,
   optionalAuth,
   fullPagination,
+  asyncHandler
 } from '../middleware/index.js';
 
 // ✅ IMPORTACIONES DE SEGURIDAD
@@ -16,9 +19,6 @@ import {
   authRateLimit,
   generalRateLimit 
 } from '../middleware/security.js';
-
-const rateLimitStrict = generalRateLimit;
-const rateLimitAuth = authRateLimit;
 
 const router = express.Router();
 
@@ -32,234 +32,130 @@ const router = express.Router();
 // ✅ Aplicar seguridad
 router.use(apiSecurityMiddleware);
 
+// =================== RUTAS CON CONTROLADOR REAL ===================
+
 /**
  * @swagger
- * /templates:
+ * /api/templates:
  *   get:
- *     summary: Obtener todas las plantillas disponibles
+ *     summary: Obtener templates públicos
  *     tags: [Templates]
  */
 router.get('/', 
   optionalAuth,
-  fullPagination('template'),
-  templateController.getAllTemplates || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  templateController.getPublicTemplates
 );
 
 /**
  * @swagger
- * /templates:
+ * /api/templates:
  *   post:
- *     summary: Crear nueva plantilla
+ *     summary: Crear nuevo template
  *     tags: [Templates]
+ *     security:
+ *       - bearerAuth: []
  */
 router.post('/', 
   requireOwner,
-  templateController.createTemplate || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  templateController.createTemplate
 );
 
 /**
  * @swagger
- * /templates/featured:
+ * /api/templates/default:
  *   get:
- *     summary: Obtener plantillas destacadas
+ *     summary: Obtener template por defecto
  *     tags: [Templates]
  */
-router.get('/featured', 
-  templateController.getFeaturedTemplates || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+router.get('/default', 
+  templateController.getDefaultTemplate
 );
 
 /**
  * @swagger
- * /templates/category/{category}:
+ * /api/templates/my:
  *   get:
- *     summary: Obtener plantillas por categoría
+ *     summary: Obtener mis templates
  *     tags: [Templates]
+ *     security:
+ *       - bearerAuth: []
  */
-router.get('/category/:category', 
-  templateController.getTemplatesByCategory || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+router.get('/my', 
+  requireOwner,
+  templateController.getMyTemplates
 );
 
 /**
  * @swagger
- * /templates/categories/stats:
+ * /api/templates/test:
  *   get:
- *     summary: Estadísticas por categoría
+ *     summary: Ruta de prueba
  *     tags: [Templates]
  */
-router.get('/categories/stats', 
-  templateController.getCategoriesStats || ((req, res) => {
-    // ✅ Implementación temporal con datos de ejemplo
-    res.json({
-      success: true,
-      data: {
-        categories: [
-          {
-            category: 'modern',
-            displayName: 'Moderno',
-            totalTemplates: 15,
-            totalUsage: 342,
-            averageRating: 4.2
-          },
-          {
-            category: 'elegant',
-            displayName: 'Elegante',
-            totalTemplates: 12,
-            totalUsage: 278,
-            averageRating: 4.5
-          },
-          {
-            category: 'minimalist',
-            displayName: 'Minimalista',
-            totalTemplates: 8,
-            totalUsage: 156,
-            averageRating: 4.1
-          }
-        ],
-        summary: {
-          totalCategories: 5,
-          mostPopularCategory: 'modern',
-          totalTemplatesAcrossCategories: 35
-        }
-      }
-    });
-  })
-);
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Template routes funcionando correctamente con controlador real',
+    timestamp: new Date().toISOString(),
+    user: req.user ? {
+      id: req.user.id,
+      role: req.user.role
+    } : null
+  });
+});
 
 /**
  * @swagger
- * /templates/{id}:
+ * /api/templates/{templateId}:
  *   get:
- *     summary: Obtener plantilla por ID
+ *     summary: Obtener template por ID
  *     tags: [Templates]
  */
-router.get('/:id', 
+router.get('/:templateId', 
   optionalAuth,
-  templateController.getTemplateById || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  templateController.getTemplateById
 );
 
 /**
  * @swagger
- * /templates/{id}:
+ * /api/templates/{templateId}:
  *   put:
- *     summary: Actualizar plantilla
+ *     summary: Actualizar template
  *     tags: [Templates]
+ *     security:
+ *       - bearerAuth: []
  */
-router.put('/:id', 
+router.put('/:templateId', 
   requireOwner,
-  templateController.updateTemplate || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  templateController.updateTemplate
 );
 
 /**
  * @swagger
- * /templates/{id}:
+ * /api/templates/{templateId}:
  *   delete:
- *     summary: Eliminar plantilla
+ *     summary: Eliminar template
  *     tags: [Templates]
+ *     security:
+ *       - bearerAuth: []
  */
-router.delete('/:id', 
+router.delete('/:templateId', 
   requireOwner,
-  templateController.deleteTemplate || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  templateController.deleteTemplate
 );
 
 /**
  * @swagger
- * /templates/{templateId}/apply/{businessId}:
+ * /api/templates/{templateId}/duplicate:
  *   post:
- *     summary: Aplicar plantilla a un negocio
+ *     summary: Duplicar template
  *     tags: [Templates]
+ *     security:
+ *       - bearerAuth: []
  */
-router.post('/:templateId/apply/:businessId', 
+router.post('/:templateId/duplicate', 
   requireOwner,
-  templateController.applyTemplateToBusiness || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
-);
-
-/**
- * @swagger
- * /templates/{id}/duplicate:
- *   post:
- *     summary: Duplicar plantilla
- *     tags: [Templates]
- */
-router.post('/:id/duplicate', 
-  requireOwner,
-  templateController.duplicateTemplate || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
-);
-
-/**
- * @swagger
- * /templates/{id}/rate:
- *   post:
- *     summary: Calificar plantilla
- *     tags: [Templates]
- */
-router.post('/:id/rate', 
-  requireOwner,
-  templateController.rateTemplate || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
-);
-
-/**
- * @swagger
- * /templates/{id}/stats:
- *   get:
- *     summary: Estadísticas de la plantilla
- *     tags: [Templates]
- */
-router.get('/:id/stats', 
-  requireOwner,
-  templateController.getTemplateStats || ((req, res) => {
-    res.status(501).json({ error: 'Estadísticas no implementadas' });
-  })
-);
-
-// ============== RUTAS ADMINISTRATIVAS ==============
-
-/**
- * @swagger
- * /templates/admin/manage:
- *   get:
- *     summary: Gestión administrativa de plantillas
- *     tags: [Templates]
- */
-router.get('/admin/manage', 
-  requireOwnerOrAdmin,
-  fullPagination('template'),
-  templateController.adminManageTemplates || ((req, res) => {
-    res.status(501).json({ error: 'Gestión administrativa no implementada' });
-  })
-);
-
-/**
- * @swagger
- * /templates/admin/{id}/approve:
- *   put:
- *     summary: Aprobar plantilla (admin)
- *     tags: [Templates]
- */
-router.put('/admin/:id/approve', 
-  requireOwnerOrAdmin,
-  templateController.adminApproveTemplate || ((req, res) => {
-    res.status(501).json({ error: 'Aprobación no implementada' });
-  })
+  templateController.duplicateTemplate
 );
 
 export default router;

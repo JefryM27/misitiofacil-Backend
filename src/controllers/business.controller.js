@@ -14,6 +14,7 @@ import {
 } from '../middleware/errorHandler.js';
 import { constants, logger } from '../config/index.js';
 import { deleteFromCloudinary, optimizeImageUrl } from '../config/storage/cloudinary.js';
+import mongoose from 'mongoose';
 
 const { 
   ERROR_MESSAGES, 
@@ -32,68 +33,135 @@ export const createBusiness = asyncHandler(async (req, res) => {
     category,
     phone, 
     email,
-    templateId,
+    templateId, // Optional - user provided
     location = {},
     socialMedia = {},
     operatingHours,
     settings = {}
   } = req.body;
 
-  // Validaciones básicas
+  // ===== Basic validations =====
   throwIf(!name?.trim(), 'El nombre del negocio es requerido');
   throwIf(!category, 'La categoría del negocio es requerida');
 
-  // Verificar que el usuario es owner
+  // Only owners can create businesses
   throwIf(req.user.role !== 'owner', 'Solo los owners pueden crear negocios');
 
-  // Verificar que el usuario no tenga ya un negocio
+  // One business per owner (adjust if you allow multiple)
   const existingBusiness = await Business.findOne({ owner: req.user.id });
   throwIf(existingBusiness, 'Ya tienes un negocio registrado');
 
-  // Validar template si se proporciona
-  let template = null;
-  if (templateId) {
-    template = await Template.findById(templateId);
-    throwIfNotFound(template, 'Plantilla no encontrada');
-    throwIf(!template.isActive || !template.isPublic, 'Plantilla no disponible');
-  }
-
-  // Validar categoría
+  // Category validation
   throwIf(
     !Object.values(BUSINESS_TYPES).includes(category),
     `Categoría inválida. Debe ser: ${Object.values(BUSINESS_TYPES).join(', ')}`
   );
 
-  // Validar email si se proporciona
+  // Email/phone validation
   if (email && !VALIDATION_PATTERNS.EMAIL.test(email)) {
     throw new ValidationError('Formato de email inválido');
   }
-
-  // Validar teléfono si se proporciona
   if (phone && !VALIDATION_PATTERNS.PHONE_CR.test(phone) && !VALIDATION_PATTERNS.PHONE_INTERNATIONAL.test(phone)) {
     throw new ValidationError('Formato de teléfono inválido');
   }
 
-  // Crear el negocio
+  // ============== TEMPLATE RESOLUTION (reinforced) ==============
+  let finalTemplateId = null;
+
+  // ---- Debug: where are we connected and what id arrived?
+  console.log('[BUSINESS][DBG] userId     =', req.user?.id);
+  console.log('[BUSINESS][DBG] db/host    =', mongoose.connection?.name, '/', mongoose.connection?.host);
+  console.log('[BUSINESS][DBG] templateId =', templateId);
+
+  if (templateId) {
+    // 1) Guard: ensure ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(templateId)) {
+      throw new ValidationError('templateId inválido');
+    }
+
+    // 2) Extra diagnosis: does this _id exist in THIS database/collection?
+    const exists = await Template.exists({ _id: templateId });
+    console.log('[BUSINESS][DBG] Template.exists? ->', Boolean(exists));
+
+    // 3) Try to load the template
+    let template = null;
+    if (exists) {
+      template = await Template.findById(templateId);
+    }
+
+    // 4) If not found in current DB, fallback to public/default template
+    if (!template) {
+      console.warn('[BUSINESS][WARN] Template not found by _id in current DB. Using public/default fallback.');
+      const auto = await Template.findOne({ isActive: true, isPublic: true })
+        .sort({ isDefault: -1, 'usage.rating': -1, 'usage.timesUsed': -1 });
+      throwIfNotFound(auto, 'No hay templates disponibles. Revisa la conexión a la base de datos o crea un template primero.');
+      finalTemplateId = auto._id;
+      await auto.markAsUsed();
+    } else {
+      // 5) Validate status & permissions
+      throwIf(!template.isActive, 'Template no activo');
+
+      const isOwner   = template.owner?.toString() === req.user.id;
+      const isPublic  = template.isPublic === true;
+      const isDefault = template.isDefault === true;
+      const isAdmin   = req.user?.role === (constants.USER_ROLES?.ADMIN || 'admin');
+
+      if (isPublic || isOwner || isDefault || isAdmin) {
+        finalTemplateId = template._id;
+        await template.markAsUsed();
+      } else {
+        const auto = await Template.findOne({ isActive: true, isPublic: true })
+          .sort({ isDefault: -1, 'usage.rating': -1, 'usage.timesUsed': -1 });
+        throwIfNotFound(auto, 'No hay templates públicos disponibles.');
+        finalTemplateId = auto._id;
+        await auto.markAsUsed();
+      }
+    }
+  } else {
+    // No template provided -> choose a public/default template
+    const auto = await Template.findOne({ isActive: true, isPublic: true })
+      .sort({ isDefault: -1, 'usage.rating': -1, 'usage.timesUsed': -1 });
+    throwIfNotFound(auto, 'No hay templates disponibles. Crea un template primero.');
+    finalTemplateId = auto._id;
+    await auto.markAsUsed();
+  }
+
+  // ============== BUSINESS CREATION ==============
   const businessData = {
-    owner: req.user.id,
+    // --- Required by schema ---
+    ownerId: req.user.id,        // Atlas mirror
+    owner: req.user.id,          // Mongoose ref
+    templateId: finalTemplateId, // Resolved template
     name: name.trim(),
+
+    // --- Optional fields ---
     description: description?.trim() || '',
     category,
     phone: phone?.trim(),
     email: email?.toLowerCase().trim(),
+
     location: {
       address: location.address?.trim(),
       city: location.city?.trim(),
       province: location.province?.trim(),
-      country: location.country || 'CR'
+      country: location.country || 'CR',
+      ...(location.coordinates && {
+        coordinates: {
+          lat: parseFloat(location.coordinates.lat),
+          lng: parseFloat(location.coordinates.lng)
+        }
+      })
     },
+
     socialMedia: {
-      facebook: socialMedia.facebook?.trim(),
-      instagram: socialMedia.instagram?.trim(),
-      whatsapp: socialMedia.whatsapp?.trim(),
-      website: socialMedia.website?.trim()
+      facebook: socialMedia.facebook?.trim() || '',
+      instagram: socialMedia.instagram?.trim() || '',
+      whatsapp: socialMedia.whatsapp?.trim() || '',
+      website: socialMedia.website?.trim() || '',
+      tiktok: socialMedia.tiktok?.trim() || '',
+      twitter: socialMedia.twitter?.trim() || ''
     },
+
     settings: {
       allowOnlineBooking: settings.allowOnlineBooking !== false,
       requireBookingApproval: settings.requireBookingApproval || false,
@@ -101,78 +169,130 @@ export const createBusiness = asyncHandler(async (req, res) => {
       currency: settings.currency || 'CRC',
       ...settings
     },
+
     status: BUSINESS_STATUS.DRAFT
   };
 
-  // Asignar template si se proporcionó
-  if (template) {
-    businessData.templateId = template._id;
-  }
+  // Default operating hours (if none provided)
+  businessData.operatingHours = operatingHours || {
+    monday:    { isOpen: true,  openTime: '09:00', closeTime: '18:00' },
+    tuesday:   { isOpen: true,  openTime: '09:00', closeTime: '18:00' },
+    wednesday: { isOpen: true,  openTime: '09:00', closeTime: '18:00' },
+    thursday:  { isOpen: true,  openTime: '09:00', closeTime: '18:00' },
+    friday:    { isOpen: true,  openTime: '09:00', closeTime: '18:00' },
+    saturday:  { isOpen: true,  openTime: '09:00', closeTime: '16:00' },
+    sunday:    { isOpen: false }
+  };
 
-  // Configurar horarios por defecto si no se proporcionaron
-  if (!operatingHours) {
-    businessData.operatingHours = {
-      monday: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
-      tuesday: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
-      wednesday: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
-      thursday: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
-      friday: { isOpen: true, openTime: '09:00', closeTime: '18:00' },
-      saturday: { isOpen: true, openTime: '09:00', closeTime: '16:00' },
-      sunday: { isOpen: false }
-    };
-  } else {
-    businessData.operatingHours = operatingHours;
-  }
+  // Debug: payload to be saved
+  console.log('[BUSINESS][DBG] businessData:', JSON.stringify({
+    ...businessData,
+    templateId: businessData.templateId?.toString()
+  }, null, 2));
 
-  const business = new Business(businessData);
-  await business.save();
+  try {
+    const business = new Business(businessData);
+    await business.save();
 
-  // Actualizar el usuario para incluir referencia al negocio
-  await User.findByIdAndUpdate(req.user.id, { business: business._id });
+    await User.findByIdAndUpdate(req.user.id, { business: business._id });
 
-  // Marcar template como usado si se usó
-  if (template) {
-    await template.markAsUsed();
-  }
+    logger.info('Negocio creado exitosamente', { 
+      businessId: business._id, 
+      ownerId: req.user.id,
+      businessName: business.name,
+      category: business.category,
+      templateId: finalTemplateId,
+      ip: req.ip 
+    });
 
-  logger.info('Negocio creado', { 
-    businessId: business._id, 
-    ownerId: req.user.id, 
-    name: business.name,
-    category: business.category,
-    ip: req.ip 
-  });
+    res.status(201).json({
+      success: true,
+      message: SUCCESS_MESSAGES.BUSINESS_CREATED || 'Negocio creado exitosamente',
+      data: {
+        business: {
+          id: business._id,
+          name: business.name,
+          slug: business.slug,
+          category: business.category,
+          status: business.status,
+          templateId: finalTemplateId
+        }
+      }
+    });
 
-  // Poblar datos para respuesta
-  await business.populate('owner', 'fullName email');
+  } catch (error) {
+    console.error('Error al crear negocio:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.errmsg || error.message);
 
-  res.status(201).json({
-    success: true,
-    message: SUCCESS_MESSAGES.BUSINESS_CREATED || 'Negocio creado exitosamente',
-    data: {
-      business: business.toJSON()
+    if (error.code === 121) {
+      // MongoDB JSON Schema validation error
+      console.error('=== MONGODB VALIDATION ERROR (121) ===');
+      console.error('errInfo completo:', JSON.stringify(error.errInfo, null, 2));
+      throw new ValidationError('Error de validación en la base de datos', {
+        mongoError: error.errmsg,
+        details: error.errInfo?.details,
+        code: error.code
+      });
     }
-  });
+
+    if (error.name === 'ValidationError') {
+      // Mongoose validation error
+      console.error('=== MONGOOSE VALIDATION ERROR ===');
+      const validationErrors = Object.keys(error.errors).map(key => ({
+        field: key,
+        message: error.errors[key].message,
+        value: error.errors[key].value
+      }));
+      console.error('Validation errors:', validationErrors);
+      throw new ValidationError('Error de validación de Mongoose', validationErrors);
+    }
+
+    if (error.code === 11000) {
+      // Duplicate key error
+      console.error('=== DUPLICATE KEY ERROR ===');
+      console.error('keyPattern:', error.keyPattern);
+      console.error('keyValue:', error.keyValue);
+      throw new ValidationError('Ya existe un negocio con estos datos', {
+        duplicateField: Object.keys(error.keyPattern)[0],
+        duplicateValue: Object.values(error.keyValue)[0]
+      });
+    }
+
+    throw error;
+  }
 });
 
 // ============== OBTENER MI NEGOCIO ==============
 export const getMyBusiness = asyncHandler(async (req, res) => {
   const business = await Business.findOne({ owner: req.user.id })
     .populate('owner', 'fullName email')
-    .populate('services', 'name description price duration isActive')
-    .populate('templateId', 'name category previewUrl');
+    .populate({
+      path: 'services',
+      select: 'name description price duration isActive sortOrder',
+      options: { sort: { sortOrder: 1, createdAt: -1 } } // ordena desde Mongoose
+    })
+    .populate('templateId', 'name category previewUrl sections')
+    .lean(); // evita transforms que puedan hacer .sort sobre undefined
 
   throwIfNotFound(business, ERROR_MESSAGES.BUSINESS_NOT_FOUND || 'Negocio no encontrado');
 
-  // Agregar estadísticas actualizadas
-  await business.updateStats();
+  // Normalizaciones defensivas (evitan .sort sobre undefined en cualquier capa)
+  business.services = Array.isArray(business.services) ? business.services : [];
+  business.gallery = Array.isArray(business.gallery) ? business.gallery : [];
+  business.operatingHours = business.operatingHours || {};
+  business.socialMedia = business.socialMedia || {};
+  business.location = business.location || {};
+  if (business.templateId && !Array.isArray(business.templateId.sections)) {
+    business.templateId.sections = [];
+  }
 
-  res.json({
-    success: true,
-    data: {
-      business: business.toJSON()
-    }
-  });
+  // (Opcional) actualización ligera de stats sin tocar transforms
+  try {
+    await Business.updateOne({ _id: business._id }, { $set: { 'stats.lastAccessAt': new Date() } });
+  } catch (_) {}
+
+  res.json({ success: true, data: { business } });
 });
 
 // ============== OBTENER NEGOCIO POR ID ==============

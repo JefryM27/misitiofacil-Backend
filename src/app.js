@@ -1,133 +1,192 @@
-// app.js - VERSIÓN CORREGIDA (robusta contra DB caída)
+// src/app.js — Clean, production-ready setup for MiSitioFácil API
+// ─────────────────────────────────────────────────────────────
+// Loads env, configures security (Helmet/CORS), rate limits,
+// parsers, logging, routes (/api), Swagger (/api-docs),
+// static files (/uploads in dev), health endpoints and DB connection.
+// Exports startServer(), closeDatabase() and the Express app.
+// ─────────────────────────────────────────────────────────────
+
 import dotenv from 'dotenv';
-dotenv.config(); // ✅ Asegura variables de entorno disponibles
-// ── Mantenemos tu estilo y estructura ─────────────────────────────────────────
+dotenv.config();
 
 import express from 'express';
 import mongoose from 'mongoose';
-import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
 
-import { 
-  config,
-  constants, 
-  logger,
-  systemLogger,
-  security,
-} from './config/index.js';
+import { applyCors } from './config/security/cors.js';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './config/docs/swagger.js';
 
-import { 
-  errorHandler, 
-  notFoundHandler,
-} from './middleware/index.js';
+import { config, constants, logger, systemLogger } from './config/index.js';
+import { errorHandler, notFoundHandler } from './middleware/index.js';
 
+// Pull environment constants (fallbacks included)
+const { PORT = 3001, NODE_ENV = 'development' } = constants || {};
+const isProd = NODE_ENV === 'production';
 
-const { PORT = 3001, NODE_ENV = 'development' } = constants;
-
-// Crear aplicación Express
+// ─────────────────────────────────────────────────────────────
+// App
+// ─────────────────────────────────────────────────────────────
 const app = express();
+app.set('trust proxy', 1); // behind Vercel/Proxies, get real client IP
 
-// Configuración de email desde config
-const email = config.email;
-console.log('📧 Configuración de email:', email);
+// Lightweight ping for LB diagnostics
+app.get('/_ping', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
-// =================== SEGURIDAD BÁSICA ===================
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true }
-}));
+// ─────────────────────────────────────────────────────────────
+// Security: Helmet (CSP strict in prod, disabled in dev)
+// ─────────────────────────────────────────────────────────────
+app.use(
+  helmet({
+    contentSecurityPolicy: isProd
+      ? {
+          useDefaults: true,
+          directives: {
+            "default-src": ["'self'"],
+            "style-src": ["'self'", "'unsafe-inline'"],
+            "script-src": ["'self'", "'unsafe-inline'"],
+            "img-src": ["'self'", "data:", "https:"],
+            "connect-src": ["'self'"],
+            "upgrade-insecure-requests": null
+          }
+        }
+      : false,
+    hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false
+  })
+);
 
+// ─────────────────────────────────────────────────────────────
+// Compression & CORS (global, before routes)
+// ─────────────────────────────────────────────────────────────
 app.use(compression());
+applyCors(app);
 
-// =================== CORS ===================
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // Postman, apps móviles, etc.
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:5173',
-      'https://misitiofacil.com',
-      'https://www.misitiofacil.com',
-      'https://app.misitiofacil.com'
-    ];
-    if (NODE_ENV === 'development') return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+// ─────────────────────────────────────────────────────────────
+// DB connection (serverless-friendly)
+// - On Vercel we don't run startServer(); connect on first request.
+// - Reuse connection while the runtime stays warm.
+// ─────────────────────────────────────────────────────────────
+const connectDatabase = async () => {
+  const mongoUri = config?.database?.mongodb?.uri;
+  if (!mongoUri) throw new Error('MONGODB_URI is not defined in config');
+  if (mongoUri.includes('<db_password>')) throw new Error('MONGODB_URI contains placeholder <db_password>');
+
+  try {
+    if (mongoose.connection.readyState === 1) return; // already connected
+    const start = Date.now();
+    const conn = await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: config?.database?.mongodb?.timeoutMs || 15000,
+      maxPoolSize: config?.database?.mongodb?.maxPoolSize || 10,
+      socketTimeoutMS: 45000,
+      retryWrites: true,
+      w: 'majority'
+    });
+    logger.info('✅ MongoDB connected', {
+      host: conn.connection.host,
+      db: conn.connection.name,
+      tookMs: Date.now() - start
+    });
+
+    mongoose.connection.on('error', (err) => logger.error('❌ Mongo error:', err?.message || err));
+    mongoose.connection.on('disconnected', () => logger.warn('⚠️ MongoDB disconnected'));
+    mongoose.connection.on('reconnected', () => logger.info('🔄 MongoDB reconnected'));
+  } catch (error) {
+    logger.error('❌ MONGODB ERROR:', error?.message || error);
+    if (isProd) throw error;
+    logger.warn('ℹ️ Continuing without DB (development). /health will show ERROR.');
+  }
 };
-app.use(cors(corsOptions));
 
-// =================== RATE LIMITING ===================
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: NODE_ENV === 'production' ? 100 : 1000,
-  message: { 
-    error: 'Demasiadas solicitudes desde esta IP, intenta de nuevo en 15 minutos.', 
-    retryAfter: '15 minutes' 
-  },
+// Connect once per runtime before handling routes
+let mongoReadyPromise;
+app.use(async (_req, _res, next) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      mongoReadyPromise ??= connectDatabase();
+      await mongoReadyPromise;
+    }
+    next();
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// Rate limiting (global + tighter for /api/auth) with real IP
+// ─────────────────────────────────────────────────────────────
+const getRealIp = (req) =>
+  req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+  req.socket?.remoteAddress ||
+  req.ip;
+
+const generalLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+  max: Number(process.env.RATE_LIMIT_MAX_REQUESTS || (isProd ? 100 : 1000)),
+  message: { error: 'Too many requests from this IP, try again in 15 minutes.', retryAfter: '15 minutes' },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1'
+  keyGenerator: getRealIp,
+  skip: (req) => process.env.SKIP_RATE_LIMIT === 'true' || ['127.0.0.1', '::1'].includes(getRealIp(req))
 });
-app.use(limiter);
+app.use(generalLimiter);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  message: { 
-    error: 'Demasiados intentos de login, intenta de nuevo en 15 minutos.', 
-    retryAfter: '15 minutes' 
-  },
+  message: { error: 'Too many login attempts, try again in 15 minutes.', retryAfter: '15 minutes' },
   skipSuccessfulRequests: true,
-  skip: (req) => NODE_ENV === 'development' && (req.ip === '127.0.0.1' || req.ip === '::1')
+  keyGenerator: getRealIp,
+  skip: (req) => NODE_ENV === 'development' && ['127.0.0.1', '::1'].includes(getRealIp(req))
 });
-
-// Rate limiting para auth
 app.use('/api/auth', authLimiter);
 
-// =================== BODY PARSERS + LOGS ===================
-app.use(express.json({ 
-  limit: '10mb',
-  verify: (req, res, buf) => {
-    try { JSON.parse(buf); } 
-    catch (e) { 
-      res.status(400).json({ error: 'Invalid JSON' }); 
-      throw new Error('Invalid JSON'); 
+// ─────────────────────────────────────────────────────────────
+// Parsers & Logging (must be before routes)
+// ─────────────────────────────────────────────────────────────
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req, res, buf) => {
+      if (!buf?.length) return;
+      try {
+        JSON.parse(buf.toString());
+      } catch {
+        res.status(400).json({ error: 'Invalid JSON' });
+        throw new Error('Invalid JSON');
+      }
     }
-  }
-}));
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logging
 if (NODE_ENV === 'development') {
   app.use(morgan('dev'));
 } else {
-  app.use(morgan('combined', { skip: (req, res) => res.statusCode < 400 }));
+  app.use(morgan('combined', { skip: (_req, res) => res.statusCode < 400 }));
 }
 
-// =================== ENDPOINTS BÁSICOS ===================
-app.get('/health', (req, res) => {
-  // 🔁 Responde SIEMPRE, aunque la DB esté caída (status=ERROR, 503)
+// Optional debug (dev only)
+if (!isProd && process.env.DEBUG_ROUTES === 'true') {
+  app.use((req, _res, next) => {
+    console.log(`🔍 ${req.method} ${req.originalUrl}`);
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Body parsed:', !!req.body, typeof req.body);
+    next();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Basic info endpoints
+// ─────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => {
   const health = {
     status: mongoose.connection.readyState === 1 ? 'OK' : 'ERROR',
     timestamp: new Date().toISOString(),
     environment: NODE_ENV,
-    version: config.app.version || '1.0.0',
+    version: config?.app?.version || '1.0.0',
     uptime: Math.floor(process.uptime()),
     memory: {
       used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
@@ -138,11 +197,11 @@ app.get('/health', (req, res) => {
   res.status(health.status === 'OK' ? 200 : 503).json(health);
 });
 
-app.get('/api', (req, res) => {
+app.get('/api', (_req, res) => {
   res.json({
     name: 'MiSitioFácil API',
-    version: config.app.version || '1.0.0',
-    description: 'API REST para MiSitioFácil',
+    version: config?.app?.version || '1.0.0',
+    description: 'API REST for MiSitioFácil',
     endpoints: {
       auth: `/api/auth`,
       businesses: `/api/business`,
@@ -158,200 +217,82 @@ app.get('/api', (req, res) => {
   });
 });
 
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({
-    message: '🎉 MiSitioFácil API está funcionando!',
-    version: config.app.version || '1.0.0',
+    message: '🎉 MiSitioFácil API is running!',
+    version: config?.app?.version || '1.0.0',
     environment: NODE_ENV,
     timestamp: new Date().toISOString(),
-    docs: `/api-docs`,
-    endpoints: {
-      auth: `/api/auth`,
-      business: `/api/business`,
-      services: `/api/services`,
-      reservations: `/api/reservations`,
-      users: `/api/users`,
-      templates: `/api/templates`
-    }
+    docs: `/api-docs`
   });
 });
 
-// =================== RUTAS DE LA API ===================
-const loadRoutes = async () => {
-  try {
-    const { default: authRoutes } = await import('./routes/auth.routes.js').catch(() => ({ default: null }));
-    if (authRoutes) { app.use('/api/auth', authRoutes); logger.info('✅ Rutas de autenticación cargadas'); }
+// ─────────────────────────────────────────────────────────────
+// API routes (single mount via routes/index.js)
+// ─────────────────────────────────────────────────────────────
+import apiRoutes from './routes/index.js';
+app.use('/api', apiRoutes);
 
-    const { default: userRoutes } = await import('./routes/user.routes.js').catch(() => ({ default: null }));
-    if (userRoutes) { app.use('/api/users', userRoutes); logger.info('✅ Rutas de usuarios cargadas'); }
+// ─────────────────────────────────────────────────────────────
+// Static files (dev only; prod must use Cloudinary/S3)
+// ─────────────────────────────────────────────────────────────
+if (!isProd) {
+  app.use('/uploads', express.static(config?.storage?.uploadPath || 'uploads'));
+}
 
-    const { default: businessRoutes } = await import('./routes/business.routes.js').catch(() => ({ default: null }));
-    if (businessRoutes) { app.use('/api/business', businessRoutes); logger.info('✅ Rutas de negocios cargadas'); }
-
-    const { default: serviceRoutes } = await import('./routes/service.routes.js').catch(() => ({ default: null }));
-    if (serviceRoutes) { app.use('/api/services', serviceRoutes); logger.info('✅ Rutas de servicios cargadas'); }
-
-    const { default: reservationRoutes } = await import('./routes/reservation.routes.js').catch(() => ({ default: null }));
-    if (reservationRoutes) { app.use('/api/reservations', reservationRoutes); logger.info('✅ Rutas de reservas cargadas'); }
-
-    const { default: templateRoutes } = await import('./routes/template.routes.js').catch(() => ({ default: null }));
-    if (templateRoutes) { app.use('/api/templates', templateRoutes); logger.info('✅ Rutas de plantillas cargadas'); }
-
-    const { default: swaggerSetup } = await import('./utils/swagger.js').catch(() => ({ default: null }));
-    if (swaggerSetup) { swaggerSetup(app); logger.info('✅ Documentación Swagger configurada'); }
-
-  } catch (error) {
-    logger.warn('⚠️  Error cargando algunas rutas:', error.message);
-  }
-};
-
-// Cargar rutas
-await loadRoutes();
-
-// Servir archivos estáticos
-app.use('/uploads', express.static(config.storage.uploadPath || 'uploads'));
-
-// =================== SWAGGER ===================
-import swaggerUi from 'swagger-ui-express';
-import swaggerSpec from './config/docs/swagger.js';
-
-// UI en /api-docs y JSON en /api-docs.json
+// ─────────────────────────────────────────────────────────────
+// Swagger (same origin as API) — before error handlers
+// ─────────────────────────────────────────────────────────────
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   explorer: true,
-  customSiteTitle: 'MiSitioFácil API Docs',
+  customSiteTitle: 'MiSitioFácil API Docs'
 }));
 app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
+app.get('/docs', (_req, res) => res.redirect(302, '/api-docs'));
 
-
-// =================== MANEJO DE ERRORES ===================
+// ─────────────────────────────────────────────────────────────
+// Error handlers (keep LAST)
+// ─────────────────────────────────────────────────────────────
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-
-// =================== CONEXIÓN A BASE DE DATOS ===================
-// 🔥 CAMBIO CLAVE: el servidor arranca SIEMPRE; la DB se conecta en paralelo.
-//    Si la DB falla, LOGUEAMOS pero NO tumbamos el server en desarrollo.
-const connectDatabase = async () => {
+// ─────────────────────────────────────────────────────────────
+// DB helpers (for local/testing)
+// ─────────────────────────────────────────────────────────────
+export const closeDatabase = async () => {
   try {
-    console.log('\n=== CONEXIÓN MONGODB ===');
-    const mongoUri = config.database.mongodb.uri;
-
-    if (!mongoUri) throw new Error('MONGODB_URI no definida en config');
-
-    if (mongoUri.includes('<db_password>')) {
-      throw new Error('URI contiene placeholder <db_password>');
-    }
-
-    const startTime = Date.now();
-    const conn = await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: config.database.mongodb.timeoutMs || 15000,
-      maxPoolSize: config.database.mongodb.maxPoolSize || 10,
-      socketTimeoutMS: 45000,
-      retryWrites: true,
-      w: 'majority'
-    });
-    const endTime = Date.now();
-
-    console.log('✅ ¡CONEXIÓN EXITOSA!');
-    console.log(`⏱️ Tiempo de conexión: ${endTime - startTime}ms`);
-    console.log(`🌐 Host: ${conn.connection.host}`);
-    console.log(`📊 DB: ${conn.connection.name}`);
-    console.log('=== FIN CONEXIÓN MONGODB ===\n');
-
-    mongoose.connection.on('error', (err) => console.error('❌ Mongo error:', err.message));
-    mongoose.connection.on('disconnected', () => console.log('⚠️ MongoDB desconectado'));
-    mongoose.connection.on('reconnected', () => console.log('🔄 MongoDB reconectado'));
-  } catch (error) {
-    console.error('\n❌ ERROR MONGODB:', error.message);
-
-    // 👉 No tumbamos el server en desarrollo; sí en producción
-    if (NODE_ENV === 'production') {
-      process.exit(1);
-    } else {
-      console.error('ℹ️ Continuando sin DB (development). /health mostrará ERROR.');
-    }
+    await mongoose.connection.close().catch(() => {});
+    logger.info('✅ MongoDB connection closed');
+  } catch (e) {
+    logger.warn('⚠️ Error while closing MongoDB:', e?.message || e);
   }
 };
 
-// =================== FUNCIÓN PARA INICIAR SERVIDOR ===================
-const startServer = async () => {
+// ─────────────────────────────────────────────────────────────
+// Local bootstrap (Vercel does NOT use this)
+// ─────────────────────────────────────────────────────────────
+export const startServer = async () => {
   try {
-    // ⬅️ Arrancamos servidor primero para evitar ECONNREFUSED
-    const server = app.listen(Number(PORT || 3001), '0.0.0.0', () => {
-      const eff = Number(PORT || 3001);
-      logger.info(`🚀 Servidor ejecutándose en puerto ${eff}`);
-      logger.info(`📖 Documentación: http://localhost:${eff}/api-docs`);
-      logger.info(`🏥 Health check: http://localhost:${eff}/health`);
-      logger.info(`🌍 Entorno: ${NODE_ENV}`);
-      logger.info(`🔗 API Base: http://localhost:${eff}/api`);
-
-      if (NODE_ENV === 'development') {
-        logger.info('🔧 CORS habilitado para desarrollo');
-        logger.info('🐌 Rate limiting relajado para desarrollo');
-      }
-
-      systemLogger.startup(eff);
-    });
-
-    // Conectar a la base de datos en paralelo (no bloquea el arranque)
-    connectDatabase(); // deliberate fire-and-forget en dev
-
-    // Timeouts
-    server.timeout = 30000;
-    server.keepAliveTimeout = 65000;
-    server.headersTimeout = 66000;
-
-    // Graceful shutdown
-    const gracefulShutdown = (signal) => {
-      logger.info(`📡 Señal ${signal} recibida, cerrando servidor...`);
-      systemLogger.shutdown(signal);
-      
-      server.close(async (err) => {
-        if (err) { 
-          logger.error('❌ Error al cerrar servidor:', err); 
-          process.exit(1); 
-        }
-        try { 
-          await mongoose.connection.close().catch(() => {});
-          logger.info('✅ Servidor cerrado correctamente'); 
-          process.exit(0); 
-        } catch (error) { 
-          logger.error('❌ Error durante el cierre:', error); 
-          process.exit(1); 
-        }
-      });
-
-      setTimeout(() => { 
-        logger.error('🚨 Forzando cierre del servidor...'); 
-        process.exit(1); 
-      }, 10000);
-    };
-
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    process.on('unhandledRejection', (reason, promise) => {
-      logger.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
-      gracefulShutdown('UNHANDLED_REJECTION');
-    });
-    process.on('uncaughtException', (error) => {
-      logger.error('🚨 Uncaught Exception:', error);
-      gracefulShutdown('UNCAUGHT_EXCEPTION');
-    });
-
-    return server;
-
-  } catch (error) {
-    logger.error('❌ Error al inicializar servidor:', error);
-    process.exit(1);
+    await connectDatabase();
+  } catch (e) {
+    throw e;
   }
+
+  const effPort = Number(PORT || 3001);
+  const server = app.listen(effPort, '0.0.0.0', () => {
+    logger.info(`🚀 Server listening on port ${effPort}`);
+    logger.info(`📖 Docs:       http://localhost:${effPort}/api-docs`);
+    logger.info(`🏥 Health:     http://localhost:${effPort}/health`);
+    logger.info(`🌍 Env:        ${NODE_ENV}`);
+    logger.info(`🔗 API base:   http://localhost:${effPort}/api`);
+    systemLogger.startup?.(effPort);
+  });
+
+  server.timeout = 30000;
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
+
+  return server;
 };
 
-// =================== EXPORTS ===================
 export default app;
-export { startServer };
-
-// ❗ No auto-iniciar aquí. Deja que `server.js` controle el arranque.
-// Si quieres permitir ejecución directa, descomenta este bloque:
-// if (process.env.NODE_ENV !== 'test' && import.meta.url === `file://${process.argv[1]}`) {
-//   startServer();
-// }

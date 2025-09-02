@@ -1,632 +1,524 @@
-// controllers/template.controller.js
+// src/controllers/template.controller.js
 import Template from '../models/template.js';
 import Business from '../models/business.js';
-import { controllerHandler } from '../middleware/asyncHandler.js';
-import { logger } from '../middleware/logger.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
+import {
+  ValidationError,
+  NotFoundError,
+  ConflictError,
+  throwIfNotFound,
+  throwIf
+} from '../middleware/errorHandler.js';
+import { constants, logger } from '../config/index.js';
 
-export const templateController = {
-  // ============== OBTENER TEMPLATES ==============
+const { 
+  ERROR_MESSAGES, 
+  SUCCESS_MESSAGES, 
+  TEMPLATE_CATEGORIES,
+  BUSINESS_TYPES,
+  VALIDATION_PATTERNS 
+} = constants;
+
+// ============== CREAR TEMPLATE ==============
+export const createTemplate = asyncHandler(async (req, res) => {
+  const { 
+    name, 
+    description, 
+    category,
+    businessType,
+    colors = {},
+    typography = {},
+    layout = {},
+    sections = [],
+    isPublic = false,
+    isPremium = false,
+    tags = []
+  } = req.body;
+
+  // Validaciones básicas
+  throwIf(!name?.trim(), 'El nombre del template es requerido');
+  throwIf(!category, 'La categoría del template es requerida');
+
+  // Verificar que la categoría sea válida
+  throwIf(
+    !Object.values(TEMPLATE_CATEGORIES).includes(category),
+    `Categoría inválida. Debe ser: ${Object.values(TEMPLATE_CATEGORIES).join(', ')}`
+  );
+
+  // Verificar que el businessType sea válido si se proporciona
+  if (businessType && !Object.values(BUSINESS_TYPES).includes(businessType)) {
+    throw new ValidationError(`Tipo de negocio inválido. Debe ser: ${Object.values(BUSINESS_TYPES).join(', ')}`);
+  }
+
+  // Verificar que no exista un template con el mismo nombre para este usuario
+  const existingTemplate = await Template.findOne({ 
+    owner: req.user.id, 
+    name: name.trim() 
+  });
+  throwIf(existingTemplate, 'Ya tienes un template con este nombre');
+
+  // Configuraciones por defecto
+  const defaultColors = {
+    primary: '#3B82F6',
+    secondary: '#64748B',
+    accent: '#10B981',
+    background: '#FFFFFF',
+    text: '#1F2937',
+    ...colors
+  };
+
+  const defaultTypography = {
+    primaryFont: 'Inter, sans-serif',
+    headingFont: 'Montserrat, sans-serif',
+    fontSize: {
+      base: '16px',
+      heading: '24px',
+      small: '14px'
+    },
+    ...typography
+  };
+
+  const defaultLayout = {
+    container: 'full-width',
+    header: 'centered',
+    navigation: 'horizontal',
+    footer: 'simple',
+    ...layout
+  };
+
+  // Secciones por defecto si no se proporcionan
+  const defaultSections = sections.length > 0 ? sections : [
+    { id: 'header', name: 'Encabezado', type: 'header', isVisible: true, order: 1, config: {} },
+    { id: 'hero', name: 'Sección Principal', type: 'hero', isVisible: true, order: 2, config: {} },
+    { id: 'services', name: 'Servicios', type: 'services', isVisible: true, order: 3, config: {} },
+    { id: 'about', name: 'Acerca de', type: 'about', isVisible: true, order: 4, config: {} },
+    { id: 'contact', name: 'Contacto', type: 'contact', isVisible: true, order: 5, config: {} },
+    { id: 'footer', name: 'Pie de página', type: 'footer', isVisible: true, order: 6, config: {} }
+  ];
+
+  const templateData = {
+    name: name.trim(),
+    description: description?.trim() || '',
+    category,
+    businessType,
+    owner: req.user.id,
+    colors: defaultColors,
+    typography: defaultTypography,
+    layout: defaultLayout,
+    sections: defaultSections,
+    isPublic: isPublic && req.user.role === 'admin', // Solo admins pueden crear templates públicos
+    isPremium,
+    tags: tags.filter(tag => tag && tag.trim()).map(tag => tag.trim()),
+    usage: {
+      timesUsed: 0,
+      rating: 0,
+      reviewCount: 0
+    }
+  };
+
+  const template = new Template(templateData);
+  await template.save();
+
+  logger.info('Template creado', { 
+    templateId: template._id, 
+    ownerId: req.user.id,
+    templateName: template.name,
+    category: template.category,
+    ip: req.ip 
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Template creado exitosamente',
+    data: {
+      template: {
+        id: template._id,
+        name: template.name,
+        category: template.category,
+        isPublic: template.isPublic,
+        isPremium: template.isPremium
+      }
+    }
+  });
+});
+
+// ============== OBTENER TEMPLATES PÚBLICOS ==============
+export const getPublicTemplates = asyncHandler(async (req, res) => {
+  const { 
+    category, 
+    businessType, 
+    search,
+    sort = 'popular',
+    page = 1, 
+    limit = 20 
+  } = req.query;
+
+  const filters = {
+    isPublic: true,
+    isActive: true
+  };
+
+  if (category) filters.category = category;
+  if (businessType) filters.businessType = businessType;
+  if (search) {
+    filters.$text = { $search: search };
+  }
+
+  let sortOptions = {};
+  switch (sort) {
+    case 'popular':
+      sortOptions = { 'usage.timesUsed': -1, 'usage.rating': -1 };
+      break;
+    case 'rating':
+      sortOptions = { 'usage.rating': -1, 'usage.reviewCount': -1 };
+      break;
+    case 'newest':
+      sortOptions = { createdAt: -1 };
+      break;
+    case 'name':
+      sortOptions = { name: 1 };
+      break;
+    default:
+      sortOptions = { 'usage.timesUsed': -1 };
+  }
+
+  const skip = (page - 1) * limit;
   
-  // Obtener todos los templates públicos/disponibles
-  getAllTemplates: controllerHandler(async (req, res) => {
-    const {
-      category,
-      businessType,
-      isPremium,
-      search,
-      page = 1,
-      limit = 10,
-      sortBy = 'usage.timesUsed',
-      sortOrder = 'desc'
-    } = req.query;
+  const [templates, total] = await Promise.all([
+    Template.find(filters)
+      .select('name description category businessType colors previewImage usage tags createdAt')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(Number(limit)),
+    Template.countDocuments(filters)
+  ]);
 
-    // Construir filtros
-    const filters = {
-      isActive: true,
-      $or: [
-        { isPublic: true },
-        { owner: req.user?.id } // Templates propios del usuario autenticado
-      ]
-    };
-
-    if (category) filters.category = category;
-    if (businessType) filters.businessType = businessType;
-    if (isPremium !== undefined) filters.isPremium = isPremium === 'true';
-
-    // Filtro de búsqueda por texto
-    if (search) {
-      filters.$text = { $search: search };
-    }
-
-    // Configurar ordenamiento
-    const sortConfig = {};
-    sortConfig[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-    // Ejecutar consulta con paginación
-    const skip = (page - 1) * limit;
-    const [templates, total] = await Promise.all([
-      Template.find(filters)
-        .sort(sortConfig)
-        .skip(skip)
-        .limit(parseInt(limit))
-        .populate('owner', 'username fullName')
-        .lean(),
-      Template.countDocuments(filters)
-    ]);
-
-    logger.info('Templates obtenidos', {
-      count: templates.length,
-      total,
-      filters,
-      userId: req.user?.id
-    });
-
-    res.json({
-      success: true,
-      data: {
-        templates,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / limit),
-          totalItems: total,
-          itemsPerPage: parseInt(limit),
-          hasNextPage: page * limit < total,
-          hasPrevPage: page > 1
-        }
+  res.json({
+    success: true,
+    data: {
+      templates,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / limit)
       }
-    });
-  }, 'Get All Templates'),
+    }
+  });
+});
 
-  // Obtener template por ID
-  getTemplateById: controllerHandler(async (req, res) => {
-    const { id } = req.params;
+// ============== OBTENER MIS TEMPLATES ==============
+export const getMyTemplates = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const skip = (page - 1) * limit;
+
+  const [templates, total] = await Promise.all([
+    Template.find({ owner: req.user.id })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit)),
+    Template.countDocuments({ owner: req.user.id })
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      templates,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    }
+  });
+});
+
+// ============== OBTENER TEMPLATE POR ID ==============
+export const getTemplateById = asyncHandler(async (req, res) => {
+  const template = await Template.findById(req.params.templateId)
+    .populate('owner', 'fullName email');
+
+  throwIfNotFound(template, 'Template no encontrado');
+
+  // Verificar permisos: debe ser público o del usuario actual
+  const canView = template.isPublic || 
+                  template.owner._id.toString() === req.user?.id ||
+                  req.user?.role === 'admin';
+
+  throwIf(!canView, 'No tienes permisos para ver este template');
+
+  res.json({
+    success: true,
+    data: { template }
+  });
+});
+
+// ============== ACTUALIZAR TEMPLATE ==============
+export const updateTemplate = asyncHandler(async (req, res) => {
+  const template = await Template.findById(req.params.templateId);
+  throwIfNotFound(template, 'Template no encontrado');
+
+  // Verificar permisos
+  const canEdit = template.owner.toString() === req.user.id || req.user.role === 'admin';
+  throwIf(!canEdit, 'No tienes permisos para editar este template');
+
+  const {
+    name,
+    description,
+    colors,
+    typography,
+    layout,
+    sections,
+    tags,
+    isPublic,
+    isPremium
+  } = req.body;
+
+  // Actualizar campos permitidos
+  if (name && name.trim() !== template.name) {
+    // Verificar que no exista otro template con este nombre
+    const existingTemplate = await Template.findOne({ 
+      owner: req.user.id, 
+      name: name.trim(),
+      _id: { $ne: template._id }
+    });
+    throwIf(existingTemplate, 'Ya tienes un template con este nombre');
     
-    const template = await Template.findById(id)
-      .populate('owner', 'username fullName')
-      .lean();
+    template.name = name.trim();
+  }
 
-    if (!template) {
-      return res.status(404).json({
-        success: false,
-        error: 'Template no encontrado'
-      });
-    }
+  if (description !== undefined) template.description = description.trim();
+  if (colors) template.colors = { ...template.colors, ...colors };
+  if (typography) template.typography = { ...template.typography, ...typography };
+  if (layout) template.layout = { ...template.layout, ...layout };
+  if (sections) template.sections = sections;
+  if (tags) template.tags = tags.filter(tag => tag && tag.trim()).map(tag => tag.trim());
 
-    // Verificar permisos de acceso
-    if (!template.isPublic && 
-        template.owner._id.toString() !== req.user?.id && 
-        req.user?.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para acceder a este template'
-      });
-    }
+  // Solo admins pueden cambiar isPublic
+  if (isPublic !== undefined && req.user.role === 'admin') {
+    template.isPublic = isPublic;
+  }
 
-    logger.info('Template obtenido por ID', {
-      templateId: id,
-      templateName: template.name,
-      userId: req.user?.id
-    });
+  if (isPremium !== undefined) template.isPremium = isPremium;
 
-    res.json({
+  await template.save();
+
+  logger.info('Template actualizado', { 
+    templateId: template._id, 
+    ownerId: req.user.id,
+    ip: req.ip 
+  });
+
+  res.json({
+    success: true,
+    message: 'Template actualizado exitosamente',
+    data: { template }
+  });
+});
+
+// ============== ELIMINAR TEMPLATE ==============
+export const deleteTemplate = asyncHandler(async (req, res) => {
+  const template = await Template.findById(req.params.templateId);
+  throwIfNotFound(template, 'Template no encontrado');
+
+  // Verificar permisos
+  const canDelete = template.owner.toString() === req.user.id || req.user.role === 'admin';
+  throwIf(!canDelete, 'No tienes permisos para eliminar este template');
+
+  // No permitir eliminar templates que están siendo usados
+  const businessesUsingTemplate = await Business.countDocuments({ templateId: template._id });
+  
+  throwIf(businessesUsingTemplate > 0, 
+    `No se puede eliminar el template porque está siendo usado por ${businessesUsingTemplate} negocio(s)`);
+
+  await template.deleteOne();
+
+  logger.info('Template eliminado', { 
+    templateId: template._id, 
+    ownerId: req.user.id,
+    templateName: template.name,
+    ip: req.ip 
+  });
+
+  res.json({
+    success: true,
+    message: 'Template eliminado exitosamente'
+  });
+});
+
+// ============== DUPLICAR TEMPLATE ==============
+export const duplicateTemplate = asyncHandler(async (req, res) => {
+  const sourceTemplate = await Template.findById(req.params.templateId);
+  throwIfNotFound(sourceTemplate, 'Template no encontrado');
+
+  // Verificar que el template sea público o del usuario
+  const canDuplicate = sourceTemplate.isPublic || 
+                      sourceTemplate.owner.toString() === req.user.id ||
+                      req.user.role === 'admin';
+
+  throwIf(!canDuplicate, 'No tienes permisos para duplicar este template');
+
+  const { name } = req.body;
+  const newName = name?.trim() || `${sourceTemplate.name} (Copia)`;
+
+  // Verificar que no exista un template con este nombre
+  const existingTemplate = await Template.findOne({ 
+    owner: req.user.id, 
+    name: newName 
+  });
+  throwIf(existingTemplate, 'Ya tienes un template con este nombre');
+
+  const duplicatedTemplate = await sourceTemplate.duplicate(newName, req.user.id);
+
+  logger.info('Template duplicado', { 
+    sourceTemplateId: sourceTemplate._id,
+    newTemplateId: duplicatedTemplate._id,
+    ownerId: req.user.id,
+    ip: req.ip 
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Template duplicado exitosamente',
+    data: { template: duplicatedTemplate }
+  });
+});
+
+// ============== CREAR TEMPLATE POR DEFECTO DEL SISTEMA ==============
+export const createSystemDefaultTemplate = asyncHandler(async (req, res) => {
+  // Solo admins pueden crear templates del sistema
+  throwIf(req.user.role !== 'admin', 'Solo administradores pueden crear templates del sistema');
+
+  const { businessType } = req.body;
+
+  // Verificar si ya existe un template por defecto para este tipo de negocio
+  const existingDefault = await Template.findOne({
+    isDefault: true,
+    businessType: businessType || { $exists: false }
+  });
+
+  if (existingDefault) {
+    return res.json({
       success: true,
-      data: { template }
+      message: 'Template por defecto ya existe',
+      data: { template: existingDefault }
     });
-  }, 'Get Template By ID'),
+  }
 
-  // Obtener templates por categoría
-  getTemplatesByCategory: controllerHandler(async (req, res) => {
-    const { category } = req.params;
-    const { limit = 12 } = req.query;
+  const defaultTemplate = new Template({
+    name: businessType ? `Template ${businessType.charAt(0).toUpperCase() + businessType.slice(1)}` : 'Template Universal',
+    description: `Template por defecto del sistema${businessType ? ` para ${businessType}s` : ''}`,
+    category: 'modern',
+    businessType: businessType || null,
+    owner: req.user.id,
+    isPublic: true,
+    isActive: true,
+    isDefault: true,
+    colors: {
+      primary: '#3B82F6',
+      secondary: '#64748B',
+      accent: '#10B981',
+      background: '#FFFFFF',
+      text: '#1F2937'
+    },
+    typography: {
+      primaryFont: 'Inter, sans-serif',
+      headingFont: 'Montserrat, sans-serif'
+    },
+    layout: {
+      container: 'full-width',
+      header: 'centered',
+      navigation: 'horizontal',
+      footer: 'simple'
+    },
+    sections: [
+      { id: 'header', name: 'Encabezado', type: 'header', isVisible: true, order: 1, config: {} },
+      { id: 'hero', name: 'Sección Principal', type: 'hero', isVisible: true, order: 2, config: {} },
+      { id: 'services', name: 'Servicios', type: 'services', isVisible: true, order: 3, config: {} },
+      { id: 'about', name: 'Acerca de', type: 'about', isVisible: true, order: 4, config: {} },
+      { id: 'contact', name: 'Contacto', type: 'contact', isVisible: true, order: 5, config: {} },
+      { id: 'footer', name: 'Pie de página', type: 'footer', isVisible: true, order: 6, config: {} }
+    ]
+  });
 
-    const templates = await Template.find({
-      category,
-      isActive: true,
-      isPublic: true
-    })
-    .sort({ 'usage.timesUsed': -1, 'usage.rating': -1 })
-    .limit(parseInt(limit))
-    .populate('owner', 'username fullName')
-    .lean();
+  await defaultTemplate.save();
 
-    res.json({
-      success: true,
-      data: { 
-        templates,
-        category,
-        count: templates.length
-      }
-    });
-  }, 'Get Templates By Category'),
+  logger.info('Template del sistema creado', { 
+    templateId: defaultTemplate._id,
+    businessType,
+    adminId: req.user.id,
+    ip: req.ip 
+  });
 
-  // Obtener templates populares/destacados
-  getFeaturedTemplates: controllerHandler(async (req, res) => {
-    const { limit = 6 } = req.query;
+  res.status(201).json({
+    success: true,
+    message: 'Template del sistema creado exitosamente',
+    data: { template: defaultTemplate }
+  });
+});
 
-    const templates = await Template.find({
+// ============== OBTENER TEMPLATE POR DEFECTO ==============
+export const getDefaultTemplate = asyncHandler(async (req, res) => {
+  const { businessType } = req.query;
+
+  let filter = {
+    isDefault: true,
+    isActive: true,
+    isPublic: true
+  };
+
+  // Si se especifica un tipo de negocio, buscar template específico primero
+  if (businessType) {
+    filter.businessType = businessType;
+  }
+
+  let template = await Template.findOne(filter);
+
+  // Si no hay template específico para el tipo de negocio, buscar el universal
+  if (!template && businessType) {
+    template = await Template.findOne({
+      isDefault: true,
       isActive: true,
       isPublic: true,
-      'usage.timesUsed': { $gte: 5 }, // Al menos 5 usos
-      'usage.rating': { $gte: 4.0 }   // Rating >= 4.0
-    })
-    .sort({ 
-      'usage.rating': -1, 
-      'usage.timesUsed': -1 
-    })
-    .limit(parseInt(limit))
-    .populate('owner', 'username fullName')
-    .lean();
-
-    res.json({
-      success: true,
-      data: { templates }
+      businessType: null // Template universal
     });
-  }, 'Get Featured Templates'),
+  }
 
-  // ============== CREAR TEMPLATES ==============
-  
-  // Crear nuevo template
-  createTemplate: controllerHandler(async (req, res) => {
-    const {
-      name,
-      description,
-      category,
-      businessType,
-      isPublic = false,
-      isPremium = false,
-      colors,
-      typography,
-      layout,
-      sections,
-      customCSS,
-      tags
-    } = req.body;
+  throwIfNotFound(template, 'No hay template por defecto disponible');
 
-    // Verificar que el usuario puede crear templates
-    if (req.user.role !== 'admin' && req.user.role !== 'owner') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para crear templates'
-      });
+  res.json({
+    success: true,
+    data: { template }
+  });
+});
+
+// ============== MARCAR TEMPLATE COMO USADO ==============
+export const markTemplateAsUsed = asyncHandler(async (req, res) => {
+  const template = await Template.findById(req.params.templateId);
+  throwIfNotFound(template, 'Template no encontrado');
+
+  await template.markAsUsed();
+
+  res.json({
+    success: true,
+    message: 'Template marcado como usado',
+    data: {
+      timesUsed: template.usage.timesUsed,
+      lastUsed: template.usage.lastUsed
     }
+  });
+});
 
-    // Verificar si ya existe un template con el mismo nombre para este usuario
-    const existingTemplate = await Template.findOne({
-      name,
-      owner: req.user.id
-    });
-
-    if (existingTemplate) {
-      return res.status(400).json({
-        success: false,
-        error: 'Ya tienes un template con este nombre'
-      });
-    }
-
-    // Crear el template
-    const template = await Template.create({
-      name,
-      description,
-      category,
-      businessType,
-      owner: req.user.id,
-      isPublic: req.user.role === 'admin' ? isPublic : false, // Solo admins pueden hacer templates públicos
-      isPremium: req.user.role === 'admin' ? isPremium : false,
-      colors,
-      typography,
-      layout,
-      sections,
-      customCSS,
-      tags: tags || []
-    });
-
-    await template.populate('owner', 'username fullName');
-
-    logger.success('Template creado exitosamente', {
-      templateId: template._id,
-      templateName: template.name,
-      ownerId: req.user.id,
-      category: template.category
-    });
-
-    res.status(201).json({
-      success: true,
-      data: { template }
-    });
-  }, 'Create Template'),
-
-  // ============== ACTUALIZAR TEMPLATES ==============
-  
-  // Actualizar template
-  updateTemplate: controllerHandler(async (req, res) => {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    // Buscar el template
-    const template = await Template.findById(id);
-
-    if (!template) {
-      return res.status(404).json({
-        success: false,
-        error: 'Template no encontrado'
-      });
-    }
-
-    // Verificar permisos
-    if (template.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para modificar este template'
-      });
-    }
-
-    // Campos que solo pueden modificar los admins
-    if (req.user.role !== 'admin') {
-      delete updateData.isPublic;
-      delete updateData.isPremium;
-      delete updateData.owner;
-    }
-
-    // Actualizar el template
-    const updatedTemplate = await Template.findByIdAndUpdate(
-      id,
-      { 
-        ...updateData,
-        updatedAt: new Date()
-      },
-      { 
-        new: true, 
-        runValidators: true 
-      }
-    ).populate('owner', 'username fullName');
-
-    logger.info('Template actualizado', {
-      templateId: id,
-      templateName: updatedTemplate.name,
-      userId: req.user.id
-    });
-
-    res.json({
-      success: true,
-      data: { template: updatedTemplate }
-    });
-  }, 'Update Template'),
-
-  // ============== USAR TEMPLATE ==============
-  
-  // Aplicar template a un negocio
-  applyTemplateTousiness: controllerHandler(async (req, res) => {
-    const { templateId, businessId } = req.params;
-    const { customizations = {} } = req.body;
-
-    // Verificar que el template existe y es accesible
-    const template = await Template.findById(templateId);
-    if (!template || !template.isActive) {
-      return res.status(404).json({
-        success: false,
-        error: 'Template no encontrado o inactivo'
-      });
-    }
-
-    // Verificar acceso al template
-    if (!template.isPublic && 
-        template.owner.toString() !== req.user.id && 
-        req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes acceso a este template'
-      });
-    }
-
-    // Verificar que el negocio existe y pertenece al usuario
-    const business = await Business.findById(businessId);
-    if (!business) {
-      return res.status(404).json({
-        success: false,
-        error: 'Negocio no encontrado'
-      });
-    }
-
-    if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para modificar este negocio'
-      });
-    }
-
-    // Aplicar el template al negocio
-    const templateConfig = {
-      templateId: template._id,
-      colors: { ...template.colors, ...customizations.colors },
-      typography: { ...template.typography, ...customizations.typography },
-      layout: { ...template.layout, ...customizations.layout },
-      sections: customizations.sections || template.sections,
-      customCSS: customizations.customCSS || template.customCSS,
-      appliedAt: new Date()
-    };
-
-    business.design = templateConfig;
-    await business.save();
-
-    // Marcar el template como usado
-    await template.markAsUsed();
-
-    logger.success('Template aplicado al negocio', {
-      templateId,
-      templateName: template.name,
-      businessId,
-      businessName: business.name,
-      userId: req.user.id
-    });
-
-    res.json({
-      success: true,
-      data: {
-        business,
-        template: {
-          id: template._id,
-          name: template.name,
-          category: template.category
-        }
-      }
-    });
-  }, 'Apply Template To Business'),
-
-  // ============== GESTIÓN DE TEMPLATES ==============
-  
-  // Duplicar template
-  duplicateTemplate: controllerHandler(async (req, res) => {
-    const { id } = req.params;
-    const { newName } = req.body;
-
-    // Buscar el template original
-    const originalTemplate = await Template.findById(id);
-    if (!originalTemplate) {
-      return res.status(404).json({
-        success: false,
-        error: 'Template no encontrado'
-      });
-    }
-
-    // Verificar acceso
-    if (!originalTemplate.isPublic && 
-        originalTemplate.owner.toString() !== req.user.id && 
-        req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes acceso a este template'
-      });
-    }
-
-    // Crear una copia
-    const templateData = originalTemplate.toObject();
-    delete templateData._id;
-    delete templateData.createdAt;
-    delete templateData.updatedAt;
-    delete templateData.usage;
-
-    const duplicatedTemplate = await Template.create({
-      ...templateData,
-      name: newName || `${originalTemplate.name} - Copia`,
-      owner: req.user.id,
-      isPublic: false, // Las copias no son públicas por defecto
-      isPremium: false
-    });
-
-    await duplicatedTemplate.populate('owner', 'username fullName');
-
-    logger.success('Template duplicado', {
-      originalId: id,
-      newId: duplicatedTemplate._id,
-      newName: duplicatedTemplate.name,
-      userId: req.user.id
-    });
-
-    res.status(201).json({
-      success: true,
-      data: { template: duplicatedTemplate }
-    });
-  }, 'Duplicate Template'),
-
-  // Eliminar template
-  deleteTemplate: controllerHandler(async (req, res) => {
-    const { id } = req.params;
-
-    const template = await Template.findById(id);
-    if (!template) {
-      return res.status(404).json({
-        success: false,
-        error: 'Template no encontrado'
-      });
-    }
-
-    // Verificar permisos
-    if (template.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para eliminar este template'
-      });
-    }
-
-    // Verificar si el template está siendo usado
-    const businessesUsingTemplate = await Business.countDocuments({
-      'design.templateId': id
-    });
-
-    if (businessesUsingTemplate > 0) {
-      // Soft delete - marcar como inactivo en lugar de eliminar
-      await Template.findByIdAndUpdate(id, { isActive: false });
-      
-      logger.warn('Template marcado como inactivo (en uso)', {
-        templateId: id,
-        businessesUsing: businessesUsingTemplate,
-        userId: req.user.id
-      });
-
-      return res.json({
-        success: true,
-        message: 'Template marcado como inactivo debido a que está en uso',
-        data: { businessesAffected: businessesUsingTemplate }
-      });
-    }
-
-    // Eliminación permanente si no está en uso
-    await Template.findByIdAndDelete(id);
-
-    logger.success('Template eliminado permanentemente', {
-      templateId: id,
-      userId: req.user.id
-    });
-
-    res.json({
-      success: true,
-      message: 'Template eliminado exitosamente'
-    });
-  }, 'Delete Template'),
-
-  // ============== RATING Y FEEDBACK ==============
-  
-  // Calificar template
-  rateTemplate: controllerHandler(async (req, res) => {
-    const { id } = req.params;
-    const { rating, feedback } = req.body;
-
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({
-        success: false,
-        error: 'La calificación debe estar entre 1 y 5'
-      });
-    }
-
-    const template = await Template.findById(id);
-    if (!template) {
-      return res.status(404).json({
-        success: false,
-        error: 'Template no encontrado'
-      });
-    }
-
-    // Verificar que el usuario haya usado el template
-    const hasUsedTemplate = await Business.findOne({
-      owner: req.user.id,
-      'design.templateId': id
-    });
-
-    if (!hasUsedTemplate) {
-      return res.status(403).json({
-        success: false,
-        error: 'Solo puedes calificar templates que hayas usado'
-      });
-    }
-
-    // Verificar si ya calificó
-    const existingRatingIndex = template.usage.ratings.findIndex(
-      r => r.user.toString() === req.user.id
-    );
-
-    if (existingRatingIndex !== -1) {
-      // Actualizar calificación existente
-      template.usage.ratings[existingRatingIndex] = {
-        user: req.user.id,
-        rating,
-        feedback,
-        createdAt: new Date()
-      };
-    } else {
-      // Agregar nueva calificación
-      template.usage.ratings.push({
-        user: req.user.id,
-        rating,
-        feedback,
-        createdAt: new Date()
-      });
-    }
-
-    // Recalcular rating promedio
-    const totalRatings = template.usage.ratings.length;
-    const sumRatings = template.usage.ratings.reduce((sum, r) => sum + r.rating, 0);
-    template.usage.rating = totalRatings > 0 ? sumRatings / totalRatings : 0;
-
-    await template.save();
-
-    logger.success('Template calificado', {
-      templateId: id,
-      rating,
-      newAverage: template.usage.rating,
-      userId: req.user.id
-    });
-
-    res.json({
-      success: true,
-      data: {
-        rating: template.usage.rating,
-        totalRatings: totalRatings,
-        userRating: rating
-      }
-    });
-  }, 'Rate Template'),
-
-  // ============== ESTADÍSTICAS ==============
-  
-  // Obtener estadísticas de templates
-  getTemplateStats: controllerHandler(async (req, res) => {
-    const { id } = req.params;
-
-    const template = await Template.findById(id);
-    if (!template) {
-      return res.status(404).json({
-        success: false,
-        error: 'Template no encontrado'
-      });
-    }
-
-    // Verificar permisos
-    if (template.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para ver estas estadísticas'
-      });
-    }
-
-    // Obtener estadísticas de uso
-    const businessesUsing = await Business.countDocuments({
-      'design.templateId': id
-    });
-
-    const recentUsage = await Business.aggregate([
-      { $match: { 'design.templateId': mongoose.Types.ObjectId(id) } },
-      { 
-        $group: {
-          _id: {
-            year: { $year: '$design.appliedAt' },
-            month: { $month: '$design.appliedAt' }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { '_id.year': -1, '_id.month': -1 } },
-      { $limit: 12 }
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        template: {
-          id: template._id,
-          name: template.name,
-          category: template.category
-        },
-        stats: {
-          timesUsed: template.usage.timesUsed,
-          currentlyUsing: businessesUsing,
-          rating: template.usage.rating,
-          totalRatings: template.usage.ratings.length,
-          lastUsed: template.usage.lastUsed,
-          recentUsageByMonth: recentUsage
-        }
-      }
-    });
-  }, 'Get Template Stats')
+export default {
+  createTemplate,
+  getPublicTemplates,
+  getMyTemplates,
+  getTemplateById,
+  updateTemplate,
+  deleteTemplate,
+  duplicateTemplate,
+  createSystemDefaultTemplate,
+  getDefaultTemplate,
+  markTemplateAsUsed
 };
-
-export default templateController;

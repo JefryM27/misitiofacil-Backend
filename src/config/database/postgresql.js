@@ -8,7 +8,7 @@ const sequelize = new Sequelize(
   {
     host: process.env.POSTGRES_HOST,
     port: process.env.POSTGRES_PORT || 5432,
-    dialect: 'postgresql',
+    dialect: 'postgres',
     
     // Pool de conexiones
     pool: {

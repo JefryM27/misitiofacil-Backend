@@ -1,22 +1,21 @@
-// routes/service.routes.js
+// src/routes/service.routes.js
 import express from 'express';
-import serviceController from '../controllers/service.controller.js'; // ✅ Sin destructuring
-
-// ✅ IMPORTACIONES DE MIDDLEWARE
-import { 
+import serviceController from '../controllers/service.controller.js';
+import {
   requireOwner,
   requireOwnerOrAdmin,
   requireBusinessOwnership,
   requireServiceOwnership,
   sanitizeServiceData,
   fullPagination,
+  routeConfigs,
 } from '../middleware/index.js';
 
-// ✅ IMPORTACIONES DE SEGURIDAD
-import { 
+// Seguridad (puedes importar estos también desde middleware/index si prefieres)
+import {
   apiSecurityMiddleware,
   authRateLimit,
-  generalRateLimit 
+  generalRateLimit,
 } from '../middleware/security.js';
 
 const rateLimitStrict = generalRateLimit;
@@ -31,7 +30,7 @@ const router = express.Router();
  *     description: Operaciones relacionadas con servicios de negocios
  */
 
-// ✅ Aplicar seguridad
+// Seguridad base para todas las rutas de este router
 router.use(apiSecurityMiddleware);
 
 /**
@@ -41,11 +40,11 @@ router.use(apiSecurityMiddleware);
  *     summary: Obtener servicios de un negocio
  *     tags: [Services]
  */
-router.get('/business/:businessId', 
+router.get(
+  '/business/:businessId',
   fullPagination('service'),
-  serviceController.getServicesByBusiness || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  serviceController.getServicesByBusiness ||
+    ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -55,13 +54,15 @@ router.get('/business/:businessId',
  *     summary: Crear servicio para un negocio
  *     tags: [Services]
  */
-router.post('/business/:businessId', 
+router.post(
+  '/business/:businessId',
   requireOwner,
-  requireBusinessOwnership(),
+  requireBusinessOwnership('businessId'),
   sanitizeServiceData,
-  serviceController.createService || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  (typeof serviceController.createService === 'function'
+    ? serviceController.createService.bind(serviceController)
+    : (req, res) =>
+        res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -71,11 +72,11 @@ router.post('/business/:businessId',
  *     summary: Buscar servicios
  *     tags: [Services]
  */
-router.get('/search', 
+router.get(
+  '/search',
   fullPagination('service'),
-  serviceController.searchServices || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  serviceController.searchServices ||
+    ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -85,10 +86,10 @@ router.get('/search',
  *     summary: Obtener servicios populares
  *     tags: [Services]
  */
-router.get('/popular', 
-  serviceController.getPopularServices || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+router.get(
+  '/popular',
+  serviceController.getPopularServices ||
+    ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -98,10 +99,10 @@ router.get('/popular',
  *     summary: Obtener categorías de servicios
  *     tags: [Services]
  */
-router.get('/categories', 
-  serviceController.getServiceCategories || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+router.get(
+  '/categories',
+  serviceController.getServiceCategories ||
+    ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -111,10 +112,10 @@ router.get('/categories',
  *     summary: Obtener servicio por ID
  *     tags: [Services]
  */
-router.get('/:serviceId', 
-  serviceController.getServiceById || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+router.get(
+  '/:serviceId',
+  serviceController.getServiceById ||
+    ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -124,13 +125,13 @@ router.get('/:serviceId',
  *     summary: Actualizar servicio
  *     tags: [Services]
  */
-router.put('/:serviceId', 
-  requireOwner,
-  requireServiceOwnership(),
-  sanitizeServiceData,
-  serviceController.updateService || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+router.put(
+  '/:serviceId',
+  ...routeConfigs.service.update('serviceId'),
+  (typeof serviceController.updateService === 'function'
+    ? serviceController.updateService.bind(serviceController)
+    : (req, res) =>
+        res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -140,12 +141,12 @@ router.put('/:serviceId',
  *     summary: Eliminar servicio
  *     tags: [Services]
  */
-router.delete('/:serviceId', 
+router.delete(
+  '/:serviceId',
   requireOwner,
-  requireServiceOwnership(),
-  serviceController.deleteService || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  requireServiceOwnership('serviceId'),
+  serviceController.deleteService ||
+    ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -155,12 +156,12 @@ router.delete('/:serviceId',
  *     summary: Activar/desactivar servicio
  *     tags: [Services]
  */
-router.put('/:serviceId/toggle-status', 
+router.put(
+  '/:serviceId/toggle-status',
   requireOwner,
-  requireServiceOwnership(),
-  serviceController.toggleServiceStatus || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  requireServiceOwnership('serviceId'),
+  serviceController.toggleServiceStatus ||
+    ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -170,12 +171,12 @@ router.put('/:serviceId/toggle-status',
  *     summary: Duplicar servicio
  *     tags: [Services]
  */
-router.post('/:serviceId/duplicate', 
+router.post(
+  '/:serviceId/duplicate',
   requireOwner,
-  requireServiceOwnership(),
-  serviceController.duplicateService || ((req, res) => {
-    res.status(501).json({ error: 'Método no implementado' });
-  })
+  requireServiceOwnership('serviceId'),
+  serviceController.duplicateService ||
+    ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -185,12 +186,13 @@ router.post('/:serviceId/duplicate',
  *     summary: Estadísticas del servicio
  *     tags: [Services]
  */
-router.get('/:serviceId/stats', 
+router.get(
+  '/:serviceId/stats',
   requireOwner,
-  requireServiceOwnership(),
-  serviceController.getServiceStats || ((req, res) => {
-    res.status(501).json({ error: 'Estadísticas no implementadas' });
-  })
+  requireServiceOwnership('serviceId'),
+  serviceController.getServiceStats ||
+    ((req, res) =>
+      res.status(501).json({ error: 'Estadísticas no implementadas' }))
 );
 
 // ============== RUTAS ADMINISTRATIVAS ==============
@@ -202,11 +204,12 @@ router.get('/:serviceId/stats',
  *     summary: Análisis de servicios (admin)
  *     tags: [Services]
  */
-router.get('/admin/analytics', 
+router.get(
+  '/admin/analytics',
   requireOwnerOrAdmin,
-  serviceController.getServicesAnalytics || ((req, res) => {
-    res.status(501).json({ error: 'Análisis administrativo no implementado' });
-  })
+  serviceController.getServicesAnalytics ||
+    ((req, res) =>
+      res.status(501).json({ error: 'Análisis administrativo no implementado' }))
 );
 
 export default router;

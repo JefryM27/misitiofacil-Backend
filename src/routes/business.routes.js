@@ -1,256 +1,346 @@
 // routes/business.routes.js
-import express from 'express';
-import businessController from '../controllers/business.controller.js';
+import express from 'express'
+import businessController from '../controllers/business.controller.js'
 
-// ✅ IMPORTACIONES DE MIDDLEWARE CORREGIDAS
-import { 
-  requireOwner,
-  requireOwnerOrAdmin, 
-  requireBusinessOwnership,
-  sanitizeBusinessData,
-  fullPagination,
-} from '../middleware/index.js';
+import { auth } from '../middleware/auth.js'
+import { requireBusinessOwnership } from '../middleware/businessOwnerShip.js'
+import { sanitizeBusinessData } from '../middleware/sanitization.js'
+import { fullPagination } from '../middleware/pagination.js'
+import { constants } from '../config/index.js'
 
-// ✅ IMPORTACIONES DE SEGURIDAD
-import { 
+const { USER_ROLES } = constants
+const requireOwner = auth(USER_ROLES.OWNER)
+// const requireOwnerOrAdmin = auth([USER_ROLES.OWNER, USER_ROLES.ADMIN])
+
+import {
   apiSecurityMiddleware,
-  authRateLimit,
-  generalRateLimit 
-} from '../middleware/security.js';
+  // authRateLimit,
+  // generalRateLimit,
+} from '../middleware/security.js'
 
-// ✅ CREAR ALIAS
-const rateLimitStrict = generalRateLimit;
-const rateLimitAuth = authRateLimit;
+const router = express.Router()
 
-const router = express.Router();
-
-// ✅ Aplicar seguridad
-router.use(apiSecurityMiddleware);
+// Seguridad base
+router.use(apiSecurityMiddleware)
+// router.use(generalRateLimit)
 
 /**
  * @swagger
- * /business:
+ * tags:
+ *   - name: Business
+ *     description: Operaciones relacionadas con negocios
+ */
+
+/**
+ * @swagger
+ * /api/business:
  *   get:
  *     summary: Lista todos los negocios (públicos)
  *     tags: [Business]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Elementos por página
+ *       - in: query
+ *         name: category
+ *         schema: { type: string, enum: [barberia, salon_belleza, spa] }
+ *         description: Filtrar por categoría
+ *       - in: query
+ *         name: city
+ *         schema: { type: string }
+ *         description: Filtrar por ciudad
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Buscar en nombre o descripción
+ *     responses:
+ *       200:
+ *         description: Lista de negocios obtenida
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/BusinessList'
  */
-// ✅ CORREGIDO: Usar listPublicBusinesses que sí existe
-router.get('/', 
-  fullPagination('business'), 
-  businessController.listPublicBusinesses
-);
+router.get(
+  '/',
+  fullPagination('business'),
+  (businessController.listPublicBusinesses || businessController.getAllBusinesses)
+)
 
 /**
  * @swagger
- * /business:
+ * /api/business:
  *   post:
  *     summary: Crear nuevo negocio
  *     tags: [Business]
+ *     security: [ { bearerAuth: [] } ]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateBusinessRequest'
+ *     responses:
+ *       201: { description: Creado }
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
  */
-router.post('/', 
-  requireOwner,
-  sanitizeBusinessData, 
-  businessController.createBusiness
-);
+router.post('/', requireOwner, sanitizeBusinessData, businessController.createBusiness)
 
 /**
  * @swagger
- * /business/my:
+ * /api/business/my:
  *   get:
  *     summary: Obtener mi negocio
  *     tags: [Business]
+ *     security: [ { bearerAuth: [] } ]
+ *     responses:
+ *       200: { description: OK }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
  */
-// ✅ CORREGIDO: Usar getMyBusiness que sí existe
-router.get('/my', 
-  requireOwner, 
-  businessController.getMyBusiness
-);
+router.get('/my', requireOwner, (businessController.getMyBusiness || businessController.getMyBusinesses))
 
 /**
  * @swagger
- * /business/{businessId}:
- *   get:
- *     summary: Obtener negocio por ID
- *     tags: [Business]
- */
-router.get('/:businessId', 
-  businessController.getBusinessById
-);
-
-/**
- * @swagger
- * /business/{businessId}:
- *   put:
- *     summary: Actualizar negocio
- *     tags: [Business]
- */
-router.put('/:businessId', 
-  requireOwner,
-  requireBusinessOwnership(),
-  sanitizeBusinessData, 
-  businessController.updateBusiness
-);
-
-/**
- * @swagger
- * /business/{businessId}:
- *   delete:
- *     summary: Eliminar negocio
- *     tags: [Business]
- */
-router.delete('/:businessId', 
-  requireOwner,
-  requireBusinessOwnership(),
-  businessController.deleteBusiness
-);
-
-/**
- * @swagger
- * /business/{businessId}/publish:
- *   put:
- *     summary: Publicar/despublicar negocio
- *     tags: [Business]
- */
-// ✅ CORREGIDO: Usar changeBusinessStatus que sí existe
-router.put('/:businessId/publish', 
-  requireOwner,
-  requireBusinessOwnership(),
-  businessController.changeBusinessStatus
-);
-
-/**
- * @swagger
- * /business/slug/{slug}:
+ * /api/business/slug/{slug}:
  *   get:
  *     summary: Obtener negocio por slug (URL amigable)
  *     tags: [Business]
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
  */
-router.get('/slug/:slug', 
-  businessController.getBusinessBySlug
-);
+router.get('/slug/:slug', businessController.getBusinessBySlug)
 
 /**
  * @swagger
- * /business/{businessId}/logo:
+ * /api/business/{businessId}:
+ *   get:
+ *     summary: Obtener negocio por ID
+ *     tags: [Business]
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ */
+router.get('/:businessId', businessController.getBusinessById)
+
+/**
+ * @swagger
+ * /api/business/{businessId}:
+ *   put:
+ *     summary: Actualizar negocio
+ *     tags: [Business]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateBusinessRequest'
+ *     responses:
+ *       200: { description: Actualizado }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ */
+router.put(
+  '/:businessId',
+  requireOwner,
+  requireBusinessOwnership('businessId'),
+  sanitizeBusinessData,
+  businessController.updateBusiness
+)
+
+/**
+ * @swagger
+ * /api/business/{businessId}:
+ *   delete:
+ *     summary: Eliminar negocio
+ *     tags: [Business]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       204: { description: Eliminado }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ */
+router.delete(
+  '/:businessId',
+  requireOwner,
+  requireBusinessOwnership('businessId'),
+  businessController.deleteBusiness
+)
+
+/**
+ * @swagger
+ * /api/business/{businessId}/publish:
+ *   put:
+ *     summary: Publicar/despublicar negocio
+ *     tags: [Business]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
+ */
+router.put(
+  '/:businessId/publish',
+  requireOwner,
+  requireBusinessOwnership('businessId'),
+  (businessController.changeBusinessStatus || businessController.publishBusiness)
+)
+
+// ---- Uploads ----
+
+const notImplemented = (what) => (req, res) => {
+  res.status(501).json({
+    success: false,
+    error: `${what} no implementado`,
+    message: `Usa la ruta /api/upload/business/{businessId}/${what === 'Upload de logo' ? 'logo' : 'cover'}`
+  })
+}
+
+/**
+ * @swagger
+ * /api/business/{businessId}/logo:
  *   post:
  *     summary: Subir logo del negocio
  *     tags: [Business]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
  */
-// ✅ AGREGADO: Ruta para subir logo
-router.post('/:businessId/logo', 
+router.post(
+  '/:businessId/logo',
   requireOwner,
-  requireBusinessOwnership(),
-  businessController.uploadLogo
-);
+  requireBusinessOwnership('businessId'),
+  (typeof businessController.uploadLogo === 'function'
+    ? businessController.uploadLogo
+    : notImplemented('Upload de logo'))
+)
 
 /**
  * @swagger
- * /business/{businessId}/cover:
+ * /api/business/{businessId}/cover:
  *   post:
  *     summary: Subir imagen de portada
  *     tags: [Business]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
  */
-// ✅ AGREGADO: Ruta para subir portada
-router.post('/:businessId/cover', 
+router.post(
+  '/:businessId/cover',
   requireOwner,
-  requireBusinessOwnership(),
-  businessController.uploadCoverImage
-);
+  requireBusinessOwnership('businessId'),
+  (typeof businessController.uploadCoverImage === 'function'
+    ? businessController.uploadCoverImage
+    : notImplemented('Upload de portada'))
+)
 
 /**
  * @swagger
- * /business/{businessId}/gallery:
- *   post:
- *     summary: Subir imágenes a galería
- *     tags: [Business]
- */
-// ✅ AGREGADO: Ruta para subir galería
-router.post('/:businessId/gallery', 
-  requireOwner,
-  requireBusinessOwnership(),
-  businessController.uploadGalleryImages
-);
-
-/**
- * @swagger
- * /business/{businessId}/gallery/{imageId}:
- *   delete:
- *     summary: Eliminar imagen de galería
- *     tags: [Business]
- */
-// ✅ AGREGADO: Ruta para eliminar imagen de galería
-router.delete('/:businessId/gallery/:imageId', 
-  requireOwner,
-  requireBusinessOwnership(),
-  businessController.deleteGalleryImage
-);
-
-// ============== RUTAS TEMPORALMENTE DESHABILITADAS ==============
-// Estas rutas requieren métodos que aún no están implementados
-
-/**
- * @swagger
- * /business/{businessId}/stats:
+ * /api/business/{businessId}/stats:
  *   get:
- *     summary: Obtener estadísticas del negocio (NO IMPLEMENTADO)
+ *     summary: Obtener estadísticas del negocio
  *     tags: [Business]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       501: { description: No implementado }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
  */
-router.get('/:businessId/stats', 
+router.get(
+  '/:businessId/stats',
   requireOwner,
-  requireBusinessOwnership(),
-  (req, res) => res.status(501).json({ 
+  requireBusinessOwnership('businessId'),
+  (req, res) => res.status(501).json({
+    success: false,
     error: 'Estadísticas no implementadas aún',
     message: 'Esta funcionalidad estará disponible pronto'
   })
-);
+)
 
 /**
  * @swagger
- * /business/{businessId}/duplicate:
+ * /api/business/{businessId}/duplicate:
  *   post:
- *     summary: Duplicar negocio (NO IMPLEMENTADO)
+ *     summary: Duplicar negocio
  *     tags: [Business]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       501: { description: No implementado }
+ *       401: { $ref: '#/components/responses/UnauthorizedError' }
+ *       403: { $ref: '#/components/responses/ForbiddenError' }
+ *       404: { $ref: '#/components/responses/NotFoundError' }
  */
-router.post('/:businessId/duplicate', 
+router.post(
+  '/:businessId/duplicate',
   requireOwner,
-  requireBusinessOwnership(),
-  (req, res) => res.status(501).json({ 
+  requireBusinessOwnership('businessId'),
+  (req, res) => res.status(501).json({
+    success: false,
     error: 'Duplicación no implementada aún',
     message: 'Esta funcionalidad estará disponible pronto'
   })
-);
+)
 
-// ============== RUTAS ADMINISTRATIVAS (TEMPORALMENTE DESHABILITADAS) ==============
-
-/**
- * @swagger
- * /business/admin/all:
- *   get:
- *     summary: Lista todos los negocios del sistema (NO IMPLEMENTADO)
- *     tags: [Business]
- */
-router.get('/admin/all', 
-  requireOwnerOrAdmin, 
-  fullPagination('business'),
-  (req, res) => res.status(501).json({ 
-    error: 'Panel administrativo no implementado aún',
-    message: 'Esta funcionalidad estará disponible pronto'
-  })
-);
-
-/**
- * @swagger
- * /business/admin/{businessId}/suspend:
- *   put:
- *     summary: Suspender/reactivar negocio (NO IMPLEMENTADO)
- *     tags: [Business]
- */
-router.put('/admin/:businessId/suspend', 
-  requireOwnerOrAdmin,
-  (req, res) => res.status(501).json({ 
-    error: 'Suspensión de negocios no implementada aún',
-    message: 'Esta funcionalidad estará disponible pronto'
-  })
-);
-
-export default router;
+export default router

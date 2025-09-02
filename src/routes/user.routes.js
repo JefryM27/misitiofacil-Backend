@@ -1,407 +1,155 @@
-// routes/auth.routes.js
+// src/routes/user.routes.js
 import express from 'express';
-import authController from '../controllers/auth.controller.js';
+import userController from '../controllers/user.controller.js';
+import { apiSecurityMiddleware } from '../middleware/security.js';
+import { sanitizeUserData } from '../middleware/index.js';
 
-// ✅ IMPORTACIONES CORREGIDAS - sin duplicados
-import { 
-  apiSecurityMiddleware,
-  authRateLimit,
-  generalRateLimit 
-} from '../middleware/security.js';
+// ✅ IMPORTACIÓN CORREGIDA: Usar requireAnyRole que acepta cualquier rol autenticado
+import { requireAnyRole, requireAdmin, auth } from '../middleware/auth.js';
 
-import { 
-  sanitizeUserData 
-} from '../middleware/index.js';
-
-// ✅ CREAR los alias una sola vez
-const rateLimitStrict = generalRateLimit;
-const rateLimitAuth = authRateLimit;
+// ✅ Crear requireAuth como alias de requireAnyRole para mantener compatibilidad
+const requireAuth = requireAnyRole;
 
 const router = express.Router();
 
 /**
  * @swagger
  * tags:
- *   - name: Auth
- *     description: Operaciones de autenticación y autorización
+ *   - name: Users
+ *     description: User profile and management
  */
 
-/**
- * @swagger
- * components:
- *   schemas:
- *     User:
- *       type: object
- *       properties:
- *         id:
- *           type: string
- *           description: ID único del usuario
- *         email:
- *           type: string
- *           format: email
- *           description: Correo electrónico del usuario
- *         fullName:
- *           type: string
- *           description: Nombre completo del usuario
- *         username:
- *           type: string
- *           description: Nombre de usuario único
- *         role:
- *           type: string
- *           enum: [owner, client, admin]
- *           description: Rol del usuario en el sistema
- *         isActive:
- *           type: boolean
- *           description: Estado de activación de la cuenta
- *     LoginRequest:
- *       type: object
- *       required:
- *         - email
- *         - password
- *       properties:
- *         email:
- *           type: string
- *           format: email
- *         password:
- *           type: string
- *           minLength: 6
- *     RegisterRequest:
- *       type: object
- *       required:
- *         - email
- *         - password
- *         - fullName
- *       properties:
- *         email:
- *           type: string
- *           format: email
- *         password:
- *           type: string
- *           minLength: 6
- *         fullName:
- *           type: string
- *         username:
- *           type: string
- *         role:
- *           type: string
- *           enum: [owner, client]
- *           default: owner
- *     AuthResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *         data:
- *           type: object
- *           properties:
- *             user:
- *               $ref: '#/components/schemas/User'
- *             token:
- *               type: string
- *               description: JWT token de acceso
- *             refreshToken:
- *               type: string
- *               description: Token para renovar acceso
- *     ApiError:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           example: false
- *         error:
- *           type: string
- *           description: Mensaje de error
- *         timestamp:
- *           type: string
- *           format: date-time
- */
-
-// ✅ Aplicar seguridad para autenticación
+// Seguridad base del router
 router.use(apiSecurityMiddleware);
 
-/**
- * @swagger
- * /auth/register:
- *   post:
- *     summary: Registrar nuevo usuario
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/RegisterRequest'
- *     responses:
- *       201:
- *         description: Usuario registrado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
- *       400:
- *         description: Datos inválidos o usuario ya existe
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiError'
- *       429:
- *         description: Demasiadas solicitudes
- */
-router.post('/register', 
-  rateLimitStrict, 
-  sanitizeUserData, 
-  authController.register
-);
+// Ping para comprobar que el router está montado: GET /api/users/_ping
+router.get('/_ping', (_req, res) => res.json({ ok: true, scope: 'users' }));
 
 /**
  * @swagger
- * /auth/login:
- *   post:
- *     summary: Iniciar sesión
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/LoginRequest'
+ * /api/users/me:
+ *   get:
+ *     summary: Get current user profile
+ *     tags: [Users]
+ *     security: [ { bearerAuth: [] } ]
  *     responses:
  *       200:
- *         description: Inicio de sesión exitoso
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
- *       401:
- *         description: Credenciales inválidas
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiError'
- *       429:
- *         description: Demasiados intentos de login
+ *         description: Current user profile
  */
-router.post('/login', 
-  rateLimitAuth, 
-  sanitizeUserData, 
-  authController.login
-);
+router.get('/me', requireAnyRole, userController.getCurrentUser);
 
 /**
  * @swagger
- * /auth/logout:
- *   post:
- *     summary: Cerrar sesión
- *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Sesión cerrada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Sesión cerrada exitosamente"
- */
-router.post('/logout', 
-  authController.logout
-);
-
-/**
- * @swagger
- * /auth/refresh-token:
- *   post:
- *     summary: Renovar token de acceso
- *     tags: [Auth]
+ * /api/users/me:
+ *   put:
+ *     summary: Update current user profile
+ *     tags: [Users]
+ *     security: [ { bearerAuth: [] } ]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - refreshToken
  *             properties:
- *               refreshToken:
- *                 type: string
- *                 description: Token de renovación válido
+ *               fullName: { type: string }
+ *               username: { type: string }
+ *               phone: { type: string }
+ *               address: { type: string }
+ *               dateOfBirth: { type: string, format: date }
+ *               avatar: { type: string }
+ *               preferences: { type: object }
+ *               socialMedia: { type: object }
  *     responses:
  *       200:
- *         description: Token renovado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     token:
- *                       type: string
- *                     refreshToken:
- *                       type: string
- *       401:
- *         description: Refresh token inválido o expirado
+ *         description: Updated user
  */
-router.post('/refresh-token', 
-  rateLimitAuth, 
-  authController.refreshToken
-);
+router.put('/me', requireAnyRole, sanitizeUserData, userController.updateProfile);
 
 /**
  * @swagger
- * /auth/forgot-password:
- *   post:
- *     summary: Solicitar recuperación de contraseña
- *     tags: [Auth]
+ * /api/users/password:
+ *   patch:
+ *     summary: Change password (logged user)
+ *     tags: [Users]
+ *     security: [ { bearerAuth: [] } ]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - email
+ *             required: [currentPassword, newPassword, confirmPassword]
  *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 description: Email del usuario que olvido su contraseña
+ *               currentPassword: { type: string }
+ *               newPassword: { type: string }
+ *               confirmPassword: { type: string }
  *     responses:
  *       200:
- *         description: Email de recuperación enviado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Email de recuperación enviado"
- *       404:
- *         description: Usuario no encontrado
- *       429:
- *         description: Demasiadas solicitudes
+ *         description: Password changed
  */
-router.post('/forgot-password', 
-  rateLimitStrict, 
-  authController.requestPasswordReset  // ✅ MÉTODO CORRECTO
-);
+router.patch('/password', requireAnyRole, userController.changePassword);
 
 /**
  * @swagger
- * /auth/reset-password:
- *   post:
- *     summary: Restablecer contraseña con token
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - token
- *               - newPassword
- *               - confirmPassword
- *             properties:
- *               token:
- *                 type: string
- *                 description: Token de recuperación recibido por email
- *               newPassword:
- *                 type: string
- *                 minLength: 6
- *                 description: Nueva contraseña
- *               confirmPassword:
- *                 type: string
- *                 minLength: 6
- *                 description: Confirmación de nueva contraseña
+ * /api/users:
+ *   get:
+ *     summary: List users (requires admin)
+ *     tags: [Users]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *       - in: query
+ *         name: role
+ *         schema: { type: string }
+ *       - in: query
+ *         name: isActive
+ *         schema: { type: boolean }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: sortBy
+ *         schema: { type: string, default: createdAt }
+ *       - in: query
+ *         name: sortOrder
+ *         schema: { type: string, enum: [asc, desc], default: desc }
  *     responses:
  *       200:
- *         description: Contraseña restablecida exitosamente
- *       400:
- *         description: Token inválido o contraseñas no coinciden
- *       429:
- *         description: Demasiadas solicitudes
+ *         description: Users list
  */
-router.post('/reset-password', 
-  rateLimitStrict, 
-  authController.resetPassword
-);
+router.get('/', requireAdmin, userController.getAllUsers);
 
 /**
  * @swagger
- * /auth/verify-email:
- *   post:
- *     summary: Verificar email con token
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - token
- *             properties:
- *               token:
- *                 type: string
- *                 description: Token de verificación recibido por email
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get user by ID (ADMIN)
+ *     tags: [Users]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
  *     responses:
  *       200:
- *         description: Email verificado exitosamente
- *       400:
- *         description: Token inválido o expirado
+ *         description: User detail
  */
-router.post('/verify-email', 
-  rateLimitStrict, 
-  // ✅ TEMPORAL: función placeholder hasta implementar
-  (req, res) => res.status(501).json({ error: 'Función no implementada aún' })
-);
-
-/**
- * @swagger
- * /auth/resend-verification:
- *   post:
- *     summary: Reenviar email de verificación
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 description: Email del usuario
- *     responses:
- *       200:
- *         description: Email de verificación reenviado
- *       404:
- *         description: Usuario no encontrado
- *       429:
- *         description: Demasiadas solicitudes
- */
-router.post('/resend-verification', 
-  rateLimitStrict, 
-  // ✅ TEMPORAL: función placeholder hasta implementar
-  (req, res) => res.status(501).json({ error: 'Función no implementada aún' })
+router.get(
+  '/:id',
+  requireAdmin,
+  // Adaptador para que el controller reciba req.params.userId (como lo espera tu código)
+  (req, _res, next) => {
+    req.params.userId = req.params.id;
+    next();
+  },
+  userController.getUserById
 );
 
 export default router;

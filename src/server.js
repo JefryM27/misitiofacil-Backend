@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 /**
  * server.js — Bootstrap for MiSitioFácil Backend
- * - Loads .env BEFORE any process.env access
- * - Performs basic pre-flight checks (Node, env vars, JWT)
- * - Dynamically imports startServer() from app.js
- * - Prints useful URLs using the same effective PORT default
+ * - Carga .env ANTES de leer process.env
+ * - Checks previos (Node, ENV, JWT)
+ * - Arranca startServer() desde app.js y guarda httpServer
+ * - Muestra URLs útiles (en dev)
+ * - Apagado limpio centralizado (señales + errores globales)
  */
 
 import dotenv from 'dotenv';
-dotenv.config(); // ✅ MUST be first so all process.env reads below are valid
+dotenv.config(); // ✅ Primero`
 
-import { logger } from './config/index.js';
+
+// Logger simple (puedes cambiar a tu logger real)
+const logger = console;
 
 /* ----------------------------- Banner (ASCII) ----------------------------- */
 const printBanner = () => {
@@ -40,12 +43,9 @@ const checkNodeVersion = () => {
 };
 
 const checkEnvironmentVariables = () => {
-  // NODE_ENV no lo hacemos bloqueante; le damos default 'development'
   if (!process.env.NODE_ENV) process.env.NODE_ENV = 'development';
-
   const required = ['MONGODB_URI', 'JWT_SECRET'];
   const missing = required.filter((k) => !process.env[k]);
-
   if (missing.length) {
     logger.error(`❌ Variables de entorno faltantes: ${missing.join(', ')}`);
     logger.error('💡 Copia .env.example a .env y configura las variables necesarias');
@@ -66,34 +66,30 @@ const checkJWTConfiguration = () => {
   logger.info('✅ Configuración JWT válida');
 };
 
-/* ----------------------------- Nice logs ----------------------------- */
-const EFFECTIVE_PORT = Number(process.env.PORT || 3001); // Usa el mismo default que app.js
+/* ----------------------------- Info & utilidades ----------------------------- */
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const EFFECTIVE_PORT = Number(process.env.PORT || 3001);
 const EFFECTIVE_HOST = process.env.HOST || 'localhost';
 
 const safeMask = (uri) => {
   if (!uri) return '(no definido)';
-  try {
-    return uri.replace(/\/\/.*@/, '//***:***@');
-  } catch {
-    return '(valor inválido)';
-  }
+  try { return uri.replace(/\/\/.*@/, '//***:***@'); } catch { return '(valor inválido)'; }
 };
 
 const showEnvironmentInfo = () => {
   logger.info('📋 Información del entorno:');
-  logger.info(`   Entorno: ${process.env.NODE_ENV}`);
+  logger.info(`   Entorno: ${NODE_ENV}`);
   logger.info(`   Puerto: ${EFFECTIVE_PORT}`);
   logger.info(`   Base de datos: ${safeMask(process.env.MONGODB_URI)}`);
-
-  if (process.env.NODE_ENV === 'development') {
+  if (NODE_ENV === 'development') {
     logger.info('🛠️ Modo desarrollo: CORS permisivo, logs detallados, hot reload');
-  } else if (process.env.NODE_ENV === 'production') {
+  } else if (NODE_ENV === 'production') {
     logger.info('🏭 Modo producción: Seguridad y optimizaciones habilitadas');
   }
 };
 
 const showUsefulUrls = () => {
-  if (process.env.NODE_ENV !== 'development') return;
+  if (NODE_ENV !== 'development') return;
   const base = `http://${EFFECTIVE_HOST}:${EFFECTIVE_PORT}`;
   logger.info('🔗 URLs útiles:');
   logger.info(`   API Base: ${base}/api`);
@@ -114,6 +110,9 @@ const showUsefulCommands = () => {
 };
 
 /* ----------------------------- Main ----------------------------- */
+let httpServer; // se asigna al iniciar
+let closeDb;    // función de cierre de DB que seleccionaremos dinámicamente
+
 const main = async () => {
   try {
     printBanner();
@@ -125,18 +124,18 @@ const main = async () => {
     showEnvironmentInfo();
 
     logger.info('📦 Cargando aplicación Express...');
-    // app.js debe exportar: export const startServer = async () => { ... return server }
-    const { startServer } = await import('./app.js');
+    // Carga app.js que exporta startServer() y closeDatabase()
+    const { startServer, closeDatabase } = await import('./app.js');
+    closeDb = typeof closeDatabase === 'function' ? closeDatabase : null;
 
     logger.info('🔌 Iniciando servidor HTTP...');
-    const server = await startServer(); // app.listen(PORT, '0.0.0.0', ...) dentro de app.js
+    httpServer = await startServer();
 
     logger.info('✅ Servidor iniciado exitosamente');
     showUsefulUrls();
     showUsefulCommands();
     logger.info('🎉 ¡MiSitioFácil Backend está listo para recibir requests!');
-
-    return server;
+    return httpServer;
   } catch (error) {
     logger.error('❌ Error fatal al iniciar el servidor:', error);
 
@@ -157,21 +156,65 @@ const main = async () => {
   }
 };
 
-/* ----------------------------- Dev signals ----------------------------- */
-if (process.env.NODE_ENV === 'development') {
+/* ----------------------------- Graceful shutdown ----------------------------- */
+async function shutdown(signal, err) {
+  try {
+    if (err) {
+      logger.error(`💥 Error no manejado (${signal}):`, err);
+    } else {
+      logger.info(`\n🛑 Recibido ${signal}. Cerrando limpiamente...`);
+    }
+
+    // 1) Dejar de aceptar conexiones nuevas
+    if (httpServer) {
+      await new Promise((resolve) => httpServer.close(resolve));
+      logger.info('✅ HTTP server cerrado');
+    }
+
+    // 2) Cerrar base de datos (preferimos closeDatabase() de app.js)
+    if (typeof closeDb === 'function') {
+      await closeDb();
+      logger.info('✅ Conexiones a DB cerradas (app.js)');
+    } else {
+      // Fallback opcional: intenta cerrar desde config/database/index.js si existe
+      try {
+        const mod = await import('./config/database/index.js');
+        if (typeof mod.closeDatabases === 'function') {
+          await mod.closeDatabases();
+          logger.info('✅ Conexiones a DB cerradas (config/database/index.js)');
+        }
+      } catch {
+        // silencioso: no existe o no exporta closeDatabases
+      }
+    }
+
+    logger.info('👋 Apagado completo. Bye!');
+    process.exit(err ? 1 : 0);
+  } catch (e) {
+    logger.error('❌ Fallo durante el apagado:', e);
+    process.exit(1);
+  }
+}
+
+// Señales del sistema
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Errores globales
+process.on('uncaughtException', (err) => shutdown('uncaughtException', err));
+process.on('unhandledRejection', (err) => shutdown('unhandledRejection', err));
+
+// Hot reload (nodemon)
+if (NODE_ENV === 'development') {
   process.on('SIGUSR2', () => {
-    logger.info('🔄 Reiniciando servidor (nodemon)...');
-    process.exit(0);
-  });
-  process.on('SIGTERM', () => {
-    logger.info('📁 Archivos modificados, reiniciando...');
+    logger.info('🔄 Reinicio solicitado por nodemon (SIGUSR2). Saliendo limpio...');
     process.exit(0);
   });
 }
 
 /* ----------------------------- Bootstrap ----------------------------- */
 main().catch((err) => {
-  logger.error('❌ Error no manejado:', err);
+  logger.error('❌ Error no manejado en bootstrap:', err);
   process.exit(1);
 });
 

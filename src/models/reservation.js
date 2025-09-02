@@ -10,6 +10,8 @@ const {
   WEEKDAYS
 } = constants;
 
+
+
 // Schema para información del cliente (cuando no está registrado)
 const guestClientSchema = new mongoose.Schema({
   name: {
@@ -266,6 +268,8 @@ const reservationSchema = new mongoose.Schema({
   },
   toObject: { virtuals: true }
 });
+
+const Reservation = mongoose.models.Reservation || mongoose.model('Reservation', reservationSchema);
 
 // ============== VIRTUALS ==============
 
@@ -642,4 +646,4 @@ reservationSchema.statics.getStats = async function(businessId = null, dateFrom 
   }, {});
 };
 
-export default mongoose.model('Reservation', reservationSchema);
+export default mongoose.models.Reservation || mongoose.model('Reservation', reservationSchema);

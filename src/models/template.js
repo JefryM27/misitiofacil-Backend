@@ -170,6 +170,12 @@ const templateSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+
+  isDefault: {
+  type: Boolean,
+  default: false,
+  index: true
+},
   
   // Imagen de vista previa
   previewImage: {

@@ -9,16 +9,6 @@ const {
   SUPPORTED_COUNTRIES
 } = constants;
 
-// Schema para configuración de disponibilidad
-const availabilitySchema = new mongoose.Schema({
-  isAvailable: { type: Boolean, default: true },
-  maxAdvanceBookingDays: { type: Number, default: 30, min: 1, max: 365 },
-  minAdvanceHours: { type: Number, default: 2, min: 0, max: 168 },
-  maxDailyBookings: { type: Number, default: 10, min: 1, max: 100 },
-  bufferTimeBefore: { type: Number, default: 0, min: 0, max: 60 }, // minutos
-  bufferTimeAfter: { type: Number, default: 15, min: 0, max: 60 }, // minutos
-  requireApproval: { type: Boolean, default: false }
-}, { _id: false });
 
 // Schema para configuración de precios
 const pricingSchema = new mongoose.Schema({
@@ -48,6 +38,40 @@ const pricingSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true }
   }]
 }, { _id: false });
+
+// --- Subschemas de disponibilidad (JS puro con Mongoose) ---
+const daySchema = new mongoose.Schema(
+  {
+    enabled: { type: Boolean, default: true },
+    start:   { type: String,  default: '09:00' }, // 'HH:mm'
+    end:     { type: String,  default: '17:00' }, // 'HH:mm'
+    breaks:  { type: [String], default: [] },     // ej: ['12:00-12:30']
+  },
+  { _id: false }
+);
+
+const weeklyScheduleSchema = new mongoose.Schema(
+  {
+    monday:    { type: daySchema, default: () => ({}) },
+    tuesday:   { type: daySchema, default: () => ({}) },
+    wednesday: { type: daySchema, default: () => ({}) },
+    thursday:  { type: daySchema, default: () => ({}) },
+    friday:    { type: daySchema, default: () => ({}) },
+    saturday:  { type: daySchema, default: () => ({ enabled: false, start: null, end: null, breaks: [] }) },
+    sunday:    { type: daySchema, default: () => ({ enabled: false, start: null, end: null, breaks: [] }) },
+  },
+  { _id: false }
+);
+
+const availabilitySchema = new mongoose.Schema(
+  {
+    weeklySchedule: { type: weeklyScheduleSchema, default: () => ({}) },
+    slotMinutes:    { type: Number, default: 15 },
+    bufferBefore:   { type: Number, default: 0 },
+    bufferAfter:    { type: Number, default: 0 },
+  },
+  { _id: false }
+);
 
 const serviceSchema = new mongoose.Schema({
   // Relación con el negocio
@@ -156,6 +180,9 @@ const serviceSchema = new mongoose.Schema({
     maxConcurrentBookings: { type: Number, default: 1, min: 1, max: 10 },
     autoConfirm: { type: Boolean, default: true }
   },
+
+  availability: { type: availabilitySchema, default: () => ({}) },
+
   
   // Estadísticas del servicio
   stats: {
@@ -307,22 +334,21 @@ serviceSchema.post('save', async function() {
   }
 });
 
-// Validar que el negocio existe y está activo
+// Validar que el negocio existe (ya sin forzar que esté "active")
 serviceSchema.pre('save', async function(next) {
   if (this.isNew || this.isModified('business')) {
     const Business = mongoose.model('Business');
     const business = await Business.findById(this.business);
-    
+
     if (!business) {
       return next(new Error('El negocio especificado no existe'));
     }
-    
-    if (business.status !== 'active') {
-      return next(new Error('No se pueden agregar servicios a un negocio inactivo'));
-    }
+
+    // ❌ Se elimina la verificación de "status !== 'active'"
   }
   next();
 });
+
 
 // Validar límite de servicios por negocio
 serviceSchema.pre('save', async function(next) {

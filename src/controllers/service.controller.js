@@ -5,6 +5,7 @@ import Reservation from '../models/Reservation.js';
 import {
   controllerHandler,
 } from '../middleware/asyncHandler.js';
+import { throwIf, throwIfNotFound } from '../middleware/index.js';
 import { logger } from '../middleware/logger.js';
 import { deleteFromCloudinary } from '../config/storage/cloudinary.js';
 import { constants } from '../config/index.js';
@@ -16,6 +17,16 @@ const {
   SERVICE_TYPES,
   SERVICE_DURATIONS
 } = constants;
+
+const DEFAULT_WEEKLY_SCHEDULE = {
+  monday:    { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+  tuesday:   { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+  wednesday: { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+  thursday:  { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+  friday:    { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+  saturday:  { enabled: false, start: null,   end: null,   breaks: [] },
+  sunday:    { enabled: false, start: null,   end: null,   breaks: [] },
+};
 
 export const serviceController = {
 
@@ -129,97 +140,121 @@ export const serviceController = {
     });
   }, 'Get Services By Business'),
 
-  // ============== CREAR SERVICIO ==============
-  createService: controllerHandler(async (req, res) => {
-    const { businessId } = req.params;
-    const { 
-      title, 
-      description, 
-      category,
-      price, 
-      duration, 
-      serviceType = SERVICE_TYPES.INDIVIDUAL,
-      tags = [],
-      requirements = [],
-      isActive = true,
-      isPublic = true
-    } = req.body;
+  
+// ============== CREAR SERVICIO ==============
+createService: controllerHandler(async (req, res) => {
+  const { businessId } = req.params;
 
-    // Validaciones básicas
-    throwIf(!title?.trim(), 'El título del servicio es requerido');
-    throwIf(!price || price < 0, 'El precio del servicio es requerido y debe ser mayor a 0');
-    throwIf(!duration || duration < APP_LIMITS.MIN_SERVICE_DURATION, `La duración mínima es ${APP_LIMITS.MIN_SERVICE_DURATION} minutos`);
-    throwIf(duration > APP_LIMITS.MAX_SERVICE_DURATION, `La duración máxima es ${APP_LIMITS.MAX_SERVICE_DURATION} minutos`);
-    throwIf(duration % 15 !== 0, 'La duración debe ser múltiplo de 15 minutos');
+  const {
+    title,                   // puede venir como "title"
+    name: nameBody,          // o como "name"
+    description,
+    category,
+    price,
+    duration: durationBody,
+    durationMin,
+    serviceType = SERVICE_TYPES.INDIVIDUAL,
+    tags = [],
+    requirements = [],
+    isActive = true,
+    isPublic = true,
+  } = req.body;
 
-    // Verificar que el negocio existe y pertenece al usuario
-    const business = await Business.findById(businessId);
-    throwIfNotFound(business, 'Negocio no encontrado');
-    throwIf(business.owner.toString() !== req.user.id, 'No tienes permisos para este negocio');
+  // ---- Normalizaciones
+  const name = (nameBody ?? title)?.trim();
+  const duration = Number(durationBody ?? durationMin);
+  const priceNum = Number(price);
+  const categoryTrim = String(category || '').trim();
+  // Respeta los valores del enum definido en SERVICE_TYPES (no forzar case):
+  const serviceTypeVal = serviceType ?? SERVICE_TYPES.INDIVIDUAL;
 
-    // Verificar límite de servicios por negocio
-    const serviceCount = await Service.countDocuments({ business: business._id });
-    throwIf(
-      serviceCount >= APP_LIMITS.MAX_SERVICES_PER_BUSINESS,
-      `Máximo ${APP_LIMITS.MAX_SERVICES_PER_BUSINESS} servicios permitidos por negocio`
-    );
+  // ---- Validaciones básicas
+  throwIf(!name, 'El nombre del servicio es obligatorio');
+  throwIf(!Number.isFinite(priceNum) || priceNum < 1, 'El precio del servicio es requerido y debe ser >= 1');
+  throwIf(!Number.isFinite(duration) || duration < APP_LIMITS.MIN_SERVICE_DURATION,
+    `La duración mínima es ${APP_LIMITS.MIN_SERVICE_DURATION} minutos`);
+  throwIf(duration > APP_LIMITS.MAX_SERVICE_DURATION,
+    `La duración máxima es ${APP_LIMITS.MAX_SERVICE_DURATION} minutos`);
+  throwIf(duration % 15 !== 0, 'La duración debe ser múltiplo de 15 minutos');
+  throwIf(!categoryTrim, 'La categoría del servicio es requerida');
 
-    // Verificar que no existe un servicio con el mismo título en el negocio
-    const existingService = await Service.findOne({ 
-      business: business._id, 
-      title: title.trim() 
-    });
-    throwIf(existingService, 'Ya existe un servicio con ese título en tu negocio');
+  // ---- Verificar negocio y propiedad
+  const business = await Business.findById(businessId);
+  throwIfNotFound(business, 'Negocio no encontrado');
+  throwIf(String(business.owner) !== String(req.user.id), 'No tienes permisos para este negocio');
 
-    // Validar categoría
-    throwIf(!category?.trim(), 'La categoría del servicio es requerida');
+  // ---- Límite de servicios por negocio
+  const serviceCount = await Service.countDocuments({ business: business._id });
+  throwIf(serviceCount >= APP_LIMITS.MAX_SERVICES_PER_BUSINESS,
+    `Máximo ${APP_LIMITS.MAX_SERVICES_PER_BUSINESS} servicios permitidos por negocio`);
 
-    // Preparar datos del servicio
-    const serviceData = {
-      business: business._id,
-      title: title.trim(),
-      description: description?.trim() || '',
-      category: category.trim(),
-      price: Number(price),
-      duration,
-      serviceType,
-      tags: Array.isArray(tags) ? tags.filter(tag => tag.trim()).slice(0, 10) : [],
-      requirements: Array.isArray(requirements) ? requirements.filter(req => req.trim()).slice(0, 5) : [],
-      isActive,
-      isPublic,
-      createdBy: req.user.id
-    };
+  // ---- Evitar duplicados por nombre en el mismo negocio
+  const existingService = await Service.findOne({ business: business._id, name });
+  throwIf(!!existingService, 'Ya existe un servicio con ese nombre en tu negocio');
 
-    // Obtener el orden siguiente para el servicio
-    const maxOrder = await Service.findOne({ business: business._id })
-      .sort({ order: -1 })
-      .select('order');
-    
-    serviceData.order = (maxOrder?.order || 0) + 1;
+  // ---- Defaults de disponibilidad para evitar "reading 'monday'"
+  const DEFAULT_WEEKLY_SCHEDULE = {
+    monday:    { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+    tuesday:   { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+    wednesday: { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+    thursday:  { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+    friday:    { enabled: true,  start: '09:00', end: '17:00', breaks: [] },
+    saturday:  { enabled: false, start: null,   end: null,   breaks: [] },
+    sunday:    { enabled: false, start: null,   end: null,   breaks: [] },
+  };
 
-    // Crear el servicio
-    const service = await Service.create(serviceData);
+  // ---- Construir datos alineados con tu schema (pricing, availability, sortOrder)
+  const serviceData = {
+    business: business._id,
+    name,
+    description: description?.trim() || '',
+    category: categoryTrim,
+    duration,
+    pricing: {
+      basePrice: priceNum,
+      // si tienes divisa en settings del negocio, úsala:
+      currency: business?.settings?.currency || 'CRC',
+    },
+    serviceType: serviceTypeVal,
+    tags: Array.isArray(tags) ? tags.filter(t => t?.trim()).slice(0, 10) : [],
+    requirements: Array.isArray(requirements) ? requirements.filter(r => r?.trim()).slice(0, 5) : [],
+    isActive,
+    isPublic,
+    createdBy: req.user.id,
+    availability: {
+      weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+      slotMinutes: 15,
+      bufferBefore: 0,
+      bufferAfter: 0,
+    },
+  };
 
-    logger.success('Servicio creado exitosamente', { 
-      serviceId: service._id,
-      businessId: business._id, 
-      ownerId: req.user.id, 
-      serviceTitle: service.title,
-      price: service.price,
-      duration: service.duration
-    });
+  // ---- Calcular sortOrder incremental
+  const maxOrder = await Service.findOne({ business: business._id })
+    .sort({ sortOrder: -1 })
+    .select('sortOrder');
+  serviceData.sortOrder = (maxOrder?.sortOrder || 0) + 1;
 
-    // Poblar datos para respuesta
-    await service.populate('business', 'name slug');
+  // ---- Crear
+  const service = await Service.create(serviceData);
 
-    res.status(201).json({
-      success: true,
-      message: 'Servicio creado exitosamente',
-      data: {
-        service
-      }
-    });
-  }, 'Create Service'),
+  logger.success('Servicio creado exitosamente', {
+    serviceId: service._id,
+    businessId: business._id,
+    ownerId: req.user.id,
+    serviceName: service.name,
+    price: service.pricing?.basePrice,
+    duration: service.duration,
+  });
+
+  await service.populate('business', 'name slug');
+
+  res.status(201).json({
+    success: true,
+    message: 'Servicio creado exitosamente',
+    data: { service },
+  });
+}, 'Create Service'),
 
   // ============== OBTENER SERVICIO POR ID ==============
   getServiceById: controllerHandler(async (req, res) => {
@@ -264,17 +299,22 @@ export const serviceController = {
       'No tienes permisos para modificar este servicio'
     );
 
-    const {
-      title,
-      description,
-      category,
-      price,
-      duration,
-      tags,
-      requirements,
-      isActive,
-      isPublic
-    } = req.body;
+
+ const {
+   title,
+  name: nameBody,
+    description,
+    category,
+    price,
+    duration: durationBody,
+    durationMin,
+    tags,
+    requirements,
+    isActive,
+    isPublic
+  } = req.body;
+
+  const duration = durationBody ?? durationMin;
 
     // Validaciones si se cambian valores críticos
     if (title && title.trim() !== service.title) {
@@ -298,7 +338,7 @@ export const serviceController = {
 
     // Actualizar campos permitidos
     const updateData = {};
-    if (title) updateData.title = title.trim();
+    if (title != null || nameBody != null) updates.name = (nameBody ?? title).trim();
     if (description !== undefined) updateData.description = description.trim();
     if (category) updateData.category = category.trim();
     if (price !== undefined) updateData.price = Number(price);

@@ -1,607 +1,331 @@
-// controllers/user.controller.js
+// src/controllers/user.controller.js
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { User } from '../models/user.js';
-import { Business } from '../models/business.js';
-import { controllerHandler } from '../utils/asyncHandler.js';
-import { logger } from '../utils/logger.js';
-import { generateToken, generateRefreshToken } from '../utils/auth.js';
+import User from '../models/user.js';
+import Business from '../models/business.js';
+import { controllerHandler } from '../middleware/asyncHandler.js';
+import { logger } from '../middleware/logger.js';
 import { USER_ROLES } from '../config/constants.js';
 
-export const userController = {
-  
-  // ============== PERFIL DE USUARIO ==============
-  
-  // Obtener perfil del usuario actual
-  getCurrentUser: controllerHandler(async (req, res) => {
-    const user = await User.findById(req.user.id)
-      .select('-passwordHash -emailVerificationToken -passwordResetToken -loginAttempts -lockUntil')
+// util para whitelistear campos
+const pick = (obj = {}, allowed = []) =>
+  Object.fromEntries(Object.entries(obj).filter(([k]) => allowed.includes(k)));
+
+const getUserId = (req) =>
+  req.user?.id || req.user?._id || req.auth?.id || req.userId;
+
+// ──────────────────────────────────────────────────────────────────────────────
+// PERFIL
+// ──────────────────────────────────────────────────────────────────────────────
+const getCurrentUser = controllerHandler(async (req, res) => {
+  const user = await User.findById(getUserId(req))
+    .select('-passwordHash -emailVerificationToken -passwordResetToken -loginAttempts -lockUntil')
+    .lean();
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+  }
+
+  let businessInfo = null;
+  if (user.role === USER_ROLES.OWNER) {
+    const businesses = await Business.find({ owner: user._id })
+      .select('name status isActive')
       .lean();
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Usuario no encontrado'
-      });
-    }
-
-    // Si es owner, agregar información de negocios
-    let businessInfo = null;
-    if (user.role === USER_ROLES.OWNER) {
-      const businesses = await Business.find({ owner: user._id })
-        .select('name status isActive')
-        .lean();
-      
-      businessInfo = {
-        totalBusinesses: businesses.length,
-        activeBusinesses: businesses.filter(b => b.isActive).length,
-        businesses: businesses
-      };
-    }
-
-    logger.info('Perfil de usuario obtenido', {
-      userId: user._id,
-      email: user.email,
-      role: user.role
-    });
-
-    res.json({
-      success: true,
-      data: {
-        user,
-        ...(businessInfo && { businessInfo })
-      }
-    });
-  }, 'Get Current User'),
-
-  // ============== ACTUALIZACIÓN DE PERFIL ==============
-  
-  // Actualizar perfil de usuario
-  updateProfile: controllerHandler(async (req, res) => {
-    const {
-      fullName,
-      username,
-      phone,
-      address,
-      dateOfBirth,
-      avatar,
-      preferences,
-      socialMedia
-    } = req.body;
-
-    // Validar que no se intenten modificar campos restringidos
-    const restrictedFields = ['email', 'role', 'isActive', 'emailVerified', 'passwordHash'];
-    const hasRestrictedFields = restrictedFields.some(field => req.body.hasOwnProperty(field));
-    
-    if (hasRestrictedFields) {
-      return res.status(400).json({
-        success: false,
-        error: 'No se pueden modificar campos restringidos'
-      });
-    }
-
-    // Verificar si el username ya está en uso (si se está cambiando)
-    if (username) {
-      const existingUser = await User.findOne({ 
-        username, 
-        _id: { $ne: req.user.id } 
-      });
-      
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          error: 'El nombre de usuario ya está en uso'
-        });
-      }
-    }
-
-    // Preparar datos de actualización
-    const updateData = {
-      ...(fullName && { fullName }),
-      ...(username && { username }),
-      ...(phone && { phone }),
-      ...(address && { address }),
-      ...(dateOfBirth && { dateOfBirth }),
-      ...(avatar && { avatar }),
-      ...(preferences && { preferences }),
-      ...(socialMedia && { socialMedia }),
-      updatedAt: new Date()
+    businessInfo = {
+      totalBusinesses: businesses.length,
+      activeBusinesses: businesses.filter(b => b.isActive).length,
+      businesses
     };
+  }
 
-    // Actualizar usuario
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.id,
-      updateData,
-      { 
-        new: true, 
-        runValidators: true,
-        select: '-passwordHash -emailVerificationToken -passwordResetToken'
-      }
-    );
+  logger.info('Perfil de usuario obtenido', { userId: user._id, email: user.email, role: user.role });
 
-    logger.success('Perfil actualizado exitosamente', {
-      userId: req.user.id,
-      updatedFields: Object.keys(updateData),
-      userEmail: updatedUser.email
-    });
+  res.json({ success: true, data: { user, ...(businessInfo && { businessInfo }) } });
+}, 'Get Current User');
 
-    res.json({
-      success: true,
-      message: 'Perfil actualizado exitosamente',
-      data: { user: updatedUser }
-    });
-  }, 'Update Profile'),
+// ──────────────────────────────────────────────────────────────────────────────
+// ACTUALIZAR PERFIL
+// (solo campos que existen en tu schema)
+// ──────────────────────────────────────────────────────────────────────────────
+const updateProfile = controllerHandler(async (req, res) => {
+  const restrictedFields = ['email', 'role', 'isActive', 'isEmailVerified', 'passwordHash'];
+  if (restrictedFields.some((f) => Object.prototype.hasOwnProperty.call(req.body, f))) {
+    return res.status(400).json({ success: false, error: 'No se pueden modificar campos restringidos' });
+  }
 
-  // ============== GESTIÓN DE CONTRASEÑA ==============
-  
-  // Cambiar contraseña
-  changePassword: controllerHandler(async (req, res) => {
-    const { currentPassword, newPassword, confirmPassword } = req.body;
+  const allowed = ['fullName', 'username', 'phone', 'dateOfBirth', 'avatar', 'preferences'];
+  const data = pick(req.body, allowed);
 
-    // Validaciones básicas
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'Todos los campos son requeridos'
-      });
-    }
+  const updatedUser = await User.findByIdAndUpdate(
+    getUserId(req),
+    { ...data, updatedAt: new Date() },
+    { new: true, runValidators: true, select: '-passwordHash -emailVerificationToken -passwordResetToken' }
+  );
 
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'Las contraseñas no coinciden'
-      });
-    }
+  if (!updatedUser) return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        error: 'La nueva contraseña debe tener al menos 6 caracteres'
-      });
-    }
+  logger.info('Perfil actualizado', { userId: updatedUser._id, updatedFields: Object.keys(data) });
 
-    // Obtener usuario con contraseña
-    const user = await User.findById(req.user.id).select('+passwordHash');
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Usuario no encontrado'
-      });
-    }
+  res.json({ success: true, message: 'Perfil actualizado exitosamente', data: { user: updatedUser } });
+}, 'Update Profile');
 
-    // Verificar contraseña actual
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
-    
-    if (!isCurrentPasswordValid) {
-      return res.status(400).json({
-        success: false,
-        error: 'Contraseña actual incorrecta'
-      });
-    }
+// ──────────────────────────────────────────────────────────────────────────────
+// CAMBIAR CONTRASEÑA (usa el virtual `password` → hash en el modelo)
+// ──────────────────────────────────────────────────────────────────────────────
+const changePassword = controllerHandler(async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body || {};
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    return res.status(400).json({ success: false, error: 'Todos los campos son requeridos' });
+  }
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ success: false, error: 'Las contraseñas no coinciden' });
+  }
 
-    // Verificar que la nueva contraseña sea diferente
-    const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
-    
-    if (isSamePassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'La nueva contraseña debe ser diferente a la actual'
-      });
-    }
+  const user = await User.findById(getUserId(req)).select('+passwordHash');
+  if (!user) return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
 
-    // Hash de la nueva contraseña
-    const saltRounds = 12;
-    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!ok) return res.status(400).json({ success: false, error: 'Contraseña actual incorrecta' });
 
-    // Actualizar contraseña
-    await User.findByIdAndUpdate(req.user.id, {
-      passwordHash: newPasswordHash,
-      passwordChangedAt: new Date()
-    });
+  // usar el virtual del modelo
+  user.password = newPassword;
+  await user.save();
 
-    logger.success('Contraseña cambiada exitosamente', {
-      userId: req.user.id,
-      userEmail: user.email,
-      timestamp: new Date()
-    });
+  logger.info('Contraseña actualizada', { userId: user._id });
+  res.json({ success: true, message: 'Contraseña actualizada exitosamente' });
+}, 'Change Password');
 
-    res.json({
-      success: true,
-      message: 'Contraseña actualizada exitosamente'
-    });
-  }, 'Change Password'),
+// ──────────────────────────────────────────────────────────────────────────────
+// PREFERENCIAS (solo campos existentes en el schema)
+// ──────────────────────────────────────────────────────────────────────────────
+const updateNotificationPreferences = controllerHandler(async (req, res) => {
+  const { email, sms, push } = req.body?.notifications || {};
+  const user = await User.findByIdAndUpdate(
+    getUserId(req),
+    {
+      'preferences.notifications.email': email ?? true,
+      'preferences.notifications.sms': sms ?? false,
+      'preferences.notifications.push': push ?? true
+    },
+    { new: true, select: '-passwordHash' }
+  );
 
-  // ============== CONFIGURACIONES DE USUARIO ==============
-  
-  // Actualizar preferencias de notificaciones
-  updateNotificationPreferences: controllerHandler(async (req, res) => {
-    const { email, sms, push, marketing } = req.body.notifications || {};
+  logger.info('Preferencias de notificación actualizadas', {
+    userId: user?._id,
+    preferences: user?.preferences?.notifications
+  });
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      {
-        'preferences.notifications': {
-          email: email ?? true,
-          sms: sms ?? false,
-          push: push ?? true,
-          marketing: marketing ?? false
-        }
-      },
-      { new: true, select: '-passwordHash' }
-    );
+  res.json({ success: true, message: 'Preferencias de notificación actualizadas', data: { preferences: user.preferences } });
+}, 'Update Notification Preferences');
 
-    logger.info('Preferencias de notificación actualizadas', {
-      userId: req.user.id,
-      preferences: user.preferences.notifications
-    });
+// Idioma/Zona horaria (evita preferences.privacy que no existe en el schema)
+const updatePrivacySettings = controllerHandler(async (req, res) => {
+  const { language, timezone } = req.body || {};
+  const user = await User.findByIdAndUpdate(
+    getUserId(req),
+    {
+      ...(language && { 'preferences.language': language }),
+      ...(timezone && { 'preferences.timezone': timezone })
+    },
+    { new: true, select: '-passwordHash' }
+  );
+  res.json({ success: true, message: 'Preferencias actualizadas', data: { preferences: user.preferences } });
+}, 'Update Privacy Settings');
 
-    res.json({
-      success: true,
-      message: 'Preferencias de notificación actualizadas',
-      data: { 
-        preferences: user.preferences 
-      }
-    });
-  }, 'Update Notification Preferences'),
+// ──────────────────────────────────────────────────────────────────────────────
+// ADMIN
+// ──────────────────────────────────────────────────────────────────────────────
+const getAllUsers = controllerHandler(async (req, res) => {
+  if (req.user.role !== USER_ROLES.ADMIN) {
+    return res.status(403).json({ success: false, error: 'Acceso denegado' });
+  }
 
-  // Actualizar configuración de privacidad
-  updatePrivacySettings: controllerHandler(async (req, res) => {
-    const { profileVisibility, showContactInfo, allowMessages } = req.body.privacy || {};
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
+  const { role, isActive, search, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      {
-        'preferences.privacy': {
-          profileVisibility: profileVisibility || 'public',
-          showContactInfo: showContactInfo ?? true,
-          allowMessages: allowMessages ?? true
-        }
-      },
-      { new: true, select: '-passwordHash' }
-    );
+  const filters = {};
+  if (role) filters.role = role;
+  if (isActive !== undefined) filters.isActive = isActive === 'true';
+  if (search) {
+    filters.$or = [
+      { fullName: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+      { username: { $regex: search, $options: 'i' } }
+    ];
+  }
 
-    res.json({
-      success: true,
-      message: 'Configuración de privacidad actualizada',
-      data: { 
-        privacy: user.preferences.privacy 
-      }
-    });
-  }, 'Update Privacy Settings'),
+  const sortConfig = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
 
-  // ============== GESTIÓN DE CUENTA ==============
-  
-  // Activar/desactivar cuenta
-  toggleAccountStatus: controllerHandler(async (req, res) => {
-    const { isActive } = req.body;
-
-    // Solo admins pueden desactivar cuentas de otros usuarios
-    if (req.user.role !== USER_ROLES.ADMIN) {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para realizar esta acción'
-      });
-    }
-
-    const { userId } = req.params;
-    
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { 
-        isActive: isActive ?? false,
-        ...(isActive === false && { 
-          deactivatedAt: new Date(),
-          deactivatedBy: req.user.id 
-        })
-      },
-      { new: true, select: '-passwordHash' }
-    );
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Usuario no encontrado'
-      });
-    }
-
-    logger.warn('Estado de cuenta cambiado', {
-      targetUserId: userId,
-      newStatus: isActive ? 'activated' : 'deactivated',
-      changedBy: req.user.id
-    });
-
-    res.json({
-      success: true,
-      message: `Cuenta ${isActive ? 'activada' : 'desactivada'} exitosamente`,
-      data: { user }
-    });
-  }, 'Toggle Account Status'),
-
-  // Solicitar eliminación de cuenta
-  requestAccountDeletion: controllerHandler(async (req, res) => {
-    const { password, reason } = req.body;
-
-    // Verificar contraseña
-    const user = await User.findById(req.user.id).select('+passwordHash');
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-    
-    if (!isPasswordValid) {
-      return res.status(400).json({
-        success: false,
-        error: 'Contraseña incorrecta'
-      });
-    }
-
-    // Verificar si tiene negocios activos
-    if (user.role === USER_ROLES.OWNER) {
-      const activeBusinesses = await Business.countDocuments({
-        owner: req.user.id,
-        isActive: true
-      });
-
-      if (activeBusinesses > 0) {
-        return res.status(400).json({
-          success: false,
-          error: 'No puedes eliminar tu cuenta mientras tengas negocios activos',
-          data: { activeBusinesses }
-        });
-      }
-    }
-
-    // Marcar cuenta para eliminación
-    await User.findByIdAndUpdate(req.user.id, {
-      deletionRequested: true,
-      deletionRequestedAt: new Date(),
-      deletionReason: reason || 'No especificado'
-    });
-
-    logger.warn('Solicitud de eliminación de cuenta', {
-      userId: req.user.id,
-      userEmail: user.email,
-      reason: reason || 'No especificado'
-    });
-
-    res.json({
-      success: true,
-      message: 'Solicitud de eliminación procesada. Tu cuenta será eliminada en 30 días.'
-    });
-  }, 'Request Account Deletion'),
-
-  // ============== ADMINISTRACIÓN (SOLO ADMINS) ==============
-  
-  // Listar usuarios (solo admins)
-  getAllUsers: controllerHandler(async (req, res) => {
-    if (req.user.role !== USER_ROLES.ADMIN) {
-      return res.status(403).json({
-        success: false,
-        error: 'Acceso denegado'
-      });
-    }
-
-    const {
-      page = 1,
-      limit = 10,
-      role,
-      isActive,
-      search,
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
-    } = req.query;
-
-    // Construir filtros
-    const filters = {};
-    if (role) filters.role = role;
-    if (isActive !== undefined) filters.isActive = isActive === 'true';
-    if (search) {
-      filters.$or = [
-        { fullName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { username: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    // Configurar ordenamiento
-    const sortConfig = {};
-    sortConfig[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-    // Ejecutar consulta con paginación
-    const skip = (page - 1) * limit;
-    const [users, total] = await Promise.all([
-      User.find(filters)
-        .sort(sortConfig)
-        .skip(skip)
-        .limit(parseInt(limit))
-        .select('-passwordHash -emailVerificationToken -passwordResetToken')
-        .lean(),
-      User.countDocuments(filters)
-    ]);
-
-    // Agregar estadísticas de negocios para owners
-    const usersWithStats = await Promise.all(
-      users.map(async (user) => {
-        if (user.role === USER_ROLES.OWNER) {
-          const businessCount = await Business.countDocuments({ owner: user._id });
-          return { ...user, businessCount };
-        }
-        return user;
-      })
-    );
-
-    res.json({
-      success: true,
-      data: {
-        users: usersWithStats,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / limit),
-          totalItems: total,
-          itemsPerPage: parseInt(limit),
-          hasNextPage: page * limit < total,
-          hasPrevPage: page > 1
-        }
-      }
-    });
-  }, 'Get All Users'),
-
-  // Obtener usuario por ID (admin)
-  getUserById: controllerHandler(async (req, res) => {
-    if (req.user.role !== USER_ROLES.ADMIN) {
-      return res.status(403).json({
-        success: false,
-        error: 'Acceso denegado'
-      });
-    }
-
-    const { userId } = req.params;
-    
-    const user = await User.findById(userId)
+  const [users, total] = await Promise.all([
+    User.find(filters)
+      .sort(sortConfig)
+      .skip((page - 1) * limit)
+      .limit(limit)
       .select('-passwordHash -emailVerificationToken -passwordResetToken')
-      .lean();
+      .lean(),
+    User.countDocuments(filters)
+  ]);
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Usuario no encontrado'
-      });
-    }
-
-    // Agregar información adicional si es owner
-    let additionalInfo = {};
-    if (user.role === USER_ROLES.OWNER) {
-      const businesses = await Business.find({ owner: userId })
-        .select('name status isActive createdAt')
-        .lean();
-      
-      additionalInfo.businesses = businesses;
-      additionalInfo.businessStats = {
-        total: businesses.length,
-        active: businesses.filter(b => b.isActive).length
-      };
-    }
-
-    res.json({
-      success: true,
-      data: {
-        user,
-        ...additionalInfo
+  const usersWithStats = await Promise.all(
+    users.map(async (u) => {
+      if (u.role === USER_ROLES.OWNER) {
+        const businessCount = await Business.countDocuments({ owner: u._id });
+        return { ...u, businessCount };
       }
-    });
-  }, 'Get User By ID'),
+      return u;
+    })
+  );
 
-  // Actualizar rol de usuario (admin)
-  updateUserRole: controllerHandler(async (req, res) => {
-    if (req.user.role !== USER_ROLES.ADMIN) {
-      return res.status(403).json({
-        success: false,
-        error: 'Acceso denegado'
-      });
-    }
-
-    const { userId } = req.params;
-    const { role } = req.body;
-
-    if (!Object.values(USER_ROLES).includes(role)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Rol inválido'
-      });
-    }
-
-    // No permitir cambiar el rol del último admin
-    if (role !== USER_ROLES.ADMIN) {
-      const adminCount = await User.countDocuments({ 
-        role: USER_ROLES.ADMIN, 
-        isActive: true 
-      });
-      
-      const targetUser = await User.findById(userId);
-      if (targetUser.role === USER_ROLES.ADMIN && adminCount <= 1) {
-        return res.status(400).json({
-          success: false,
-          error: 'No se puede cambiar el rol del último administrador'
-        });
+  res.json({
+    success: true,
+    data: {
+      users: usersWithStats,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+        itemsPerPage: limit,
+        hasNextPage: page * limit < total,
+        hasPrevPage: page > 1
       }
     }
+  });
+}, 'Get All Users');
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { 
-        role,
-        roleChangedAt: new Date(),
-        roleChangedBy: req.user.id
-      },
-      { new: true, select: '-passwordHash' }
-    );
+const getUserById = controllerHandler(async (req, res) => {
+  if (req.user.role !== USER_ROLES.ADMIN) {
+    return res.status(403).json({ success: false, error: 'Acceso denegado' });
+  }
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Usuario no encontrado'
-      });
-    }
+  const { userId } = req.params;
+  const user = await User.findById(userId)
+    .select('-passwordHash -emailVerificationToken -passwordResetToken')
+    .lean();
 
-    logger.success('Rol de usuario actualizado', {
-      targetUserId: userId,
-      newRole: role,
-      changedBy: req.user.id
-    });
+  if (!user) return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
 
-    res.json({
-      success: true,
-      message: 'Rol actualizado exitosamente',
-      data: { user }
-    });
-  }, 'Update User Role'),
-
-  // ============== ESTADÍSTICAS DE USUARIO ==============
-  
-  // Obtener estadísticas del dashboard del usuario
-  getUserDashboardStats: controllerHandler(async (req, res) => {
-    const user = await User.findById(req.user.id);
-    
-    let stats = {
-      user: {
-        memberSince: user.createdAt,
-        lastLogin: user.lastLogin,
-        profileComplete: calculateProfileCompleteness(user)
-      }
+  let additionalInfo = {};
+  if (user.role === USER_ROLES.OWNER) {
+    const businesses = await Business.find({ owner: userId }).select('name status isActive createdAt').lean();
+    additionalInfo = {
+      businesses,
+      businessStats: { total: businesses.length, active: businesses.filter(b => b.isActive).length }
     };
+  }
 
-    // Estadísticas específicas por rol
-    if (user.role === USER_ROLES.OWNER) {
-      const businesses = await Business.find({ owner: req.user.id });
-      
-      stats.business = {
-        total: businesses.length,
-        active: businesses.filter(b => b.isActive).length,
-        draft: businesses.filter(b => b.status === 'draft').length
-      };
+  res.json({ success: true, data: { user, ...additionalInfo } });
+}, 'Get User By ID');
 
-      // TODO: Agregar estadísticas de reservas cuando esté implementado
+const updateUserRole = controllerHandler(async (req, res) => {
+  if (req.user.role !== USER_ROLES.ADMIN) {
+    return res.status(403).json({ success: false, error: 'Acceso denegado' });
+  }
+
+  const { userId } = req.params;
+  const { role } = req.body;
+
+  if (!Object.values(USER_ROLES).includes(role)) {
+    return res.status(400).json({ success: false, error: 'Rol inválido' });
+  }
+
+  // No dejar sin admins
+  if (role !== USER_ROLES.ADMIN) {
+    const adminCount = await User.countDocuments({ role: USER_ROLES.ADMIN, isActive: true });
+    const target = await User.findById(userId);
+    if (target?.role === USER_ROLES.ADMIN && adminCount <= 1) {
+      return res.status(400).json({ success: false, error: 'No se puede cambiar el rol del último administrador' });
     }
+  }
 
-    res.json({
-      success: true,
-      data: stats
-    });
-  }, 'Get User Dashboard Stats')
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { role, roleChangedAt: new Date(), roleChangedBy: getUserId(req) },
+    { new: true, select: '-passwordHash' }
+  );
+
+  if (!user) return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+
+  logger.info('Rol de usuario actualizado', { targetUserId: userId, newRole: role, changedBy: getUserId(req) });
+  res.json({ success: true, message: 'Rol actualizado exitosamente', data: { user } });
+}, 'Update User Role');
+
+// Dashboard simple
+const getUserDashboardStats = controllerHandler(async (req, res) => {
+  const user = await User.findById(getUserId(req));
+  const stats = {
+    user: {
+      memberSince: user.createdAt,
+      lastLogin: user.lastLogin,
+      profileComplete: calculateProfileCompleteness(user),
+    },
+  };
+
+  if (user.role === USER_ROLES.OWNER) {
+    const businesses = await Business.find({ owner: getUserId(req) });
+    stats.business = {
+      total: businesses.length,
+      active: businesses.filter((b) => b.isActive).length,
+      draft: businesses.filter((b) => b.status === 'draft').length,
+    };
+  }
+
+  res.json({ success: true, data: stats });
+}, 'Get User Dashboard Stats');
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CREATE (Admin) — útil para tener POST /api/users en "Users"
+// ──────────────────────────────────────────────────────────────────────────────
+const create = controllerHandler(async (req, res) => {
+  const { email, password, fullName, username, role = USER_ROLES.OWNER, country, phone } = req.body || {};
+  if (!email || !password || !fullName) {
+    return res.status(400).json({ success: false, error: 'Faltan campos requeridos: email, password, fullName' });
+  }
+
+  const exists = await User.exists({ email: email.toLowerCase().trim() });
+  if (exists) return res.status(409).json({ success: false, error: 'El email ya está registrado' });
+
+  const user = new User({ email, fullName, username, role, country, phone });
+  user.password = password; // virtual → hash en el modelo
+  await user.save();
+
+  res.status(201).json({ success: true, data: { user } });
+}, 'Create User (Admin)');
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────────────────
+const calculateProfileCompleteness = (user) => {
+  const required = ['fullName', 'email', 'phone'];
+  const optional = ['avatar', 'dateOfBirth'];
+
+  const r = required.filter((f) => user[f]).length;
+  const o = optional.filter((f) => user[f]).length;
+
+  return Math.round((r / required.length) * 70 + (o / optional.length || 1) * 30);
 };
 
-// ============== FUNCIONES AUXILIARES ==============
+// ──────────────────────────────────────────────────────────────────────────────
+// Export: compatibilidad con tus rutas y con mis ejemplos previos
+// ──────────────────────────────────────────────────────────────────────────────
+const userController = {
+  // nombres “amigables”
+  getCurrentUser,
+  updateProfile,
+  changePassword,
+  updateNotificationPreferences,
+  updatePrivacySettings,
+  getAllUsers,
+  getUserById,
+  updateUserRole,
+  getUserDashboardStats,
+  create,
 
-// Calcular completitud del perfil
-const calculateProfileCompleteness = (user) => {
-  const requiredFields = ['fullName', 'email', 'phone'];
-  const optionalFields = ['avatar', 'dateOfBirth', 'address'];
-  
-  const completedRequired = requiredFields.filter(field => user[field]).length;
-  const completedOptional = optionalFields.filter(field => user[field]).length;
-  
-  const requiredScore = (completedRequired / requiredFields.length) * 70; // 70% weight
-  const optionalScore = (completedOptional / optionalFields.length) * 30; // 30% weight
-  
-  return Math.round(requiredScore + optionalScore);
+  // alias para el router que te propuse
+  me: getCurrentUser,
+  updateMe: updateProfile,
+  list: getAllUsers,
+  getById: getUserById,
 };
 
 export default userController;

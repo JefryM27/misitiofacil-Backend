@@ -47,9 +47,10 @@ export const processFileUpload = (uploadType = 'general', options = {}) => {
     multerMiddleware(req, res, (err) => {
       try {
         // Manejar errores de multer
-        if (err) {
-          return handleMulterError(err, req, res, next);
-        }
+          if (err) {
+          const e = handleMulterError(err); // traduce a AppError/ValidationError
+        return next(e);
+      }
 
         // Verificar si el archivo es requerido
         const hasFiles = req.file || (req.files && req.files.length > 0);

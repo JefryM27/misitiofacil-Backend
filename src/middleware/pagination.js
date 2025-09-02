@@ -128,10 +128,14 @@ const processSortParam = (sortParam, allowedFields = []) => {
 };
 
 // Función para procesar parámetro de búsqueda
+// Función para procesar parámetro de búsqueda
 const processSearchParam = (searchTerm, searchFields = []) => {
   if (!searchTerm || searchFields.length === 0) {
     return {};
   }
+  
+  // Escapar caracteres especiales de regex
+  const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   
   // Crear query de búsqueda usando $or para buscar en múltiples campos
   const searchQuery = {

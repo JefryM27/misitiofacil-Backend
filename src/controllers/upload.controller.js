@@ -1,10 +1,11 @@
 // controllers/upload.controller.js
 import path from 'path';
 import fs from 'fs/promises';
+import { v2 as cloudinary } from 'cloudinary';
 import { controllerHandler } from '../middleware/asyncHandler.js';
 import { logger } from '../middleware/logger.js';
-import { 
-  cleanupTempFiles, 
+import {
+  cleanupTempFiles,
   UPLOAD_CONFIG,
   isCloudinaryConfigured,
   deleteFromCloudinary,
@@ -12,346 +13,427 @@ import {
 } from '../config/storage/index.js';
 import Business from '../models/business.js';
 
+const isProd = process.env.NODE_ENV === 'production';
+const APP_BASE =
+  (process.env.APP_URL && process.env.APP_URL.replace(/\/+$/, '')) ||
+  `http://localhost:${process.env.PORT || 3001}`;
+const useCloud =
+  isProd || (process.env.STORAGE_TYPE || '').toLowerCase() === 'cloudinary';
+
+/* ========================= Helpers ========================= */
+
+/** Devuelve la carpeta de Cloudinary según el campo */
+function cloudFolderFor(field) {
+  const base = 'misitiofacil';
+  switch ((field || '').toLowerCase()) {
+    case 'logo': return `${base}/logos`;
+    case 'cover':
+    case 'portada': return `${base}/covers`;
+    case 'gallery':
+    case 'galeria': return `${base}/gallery`;
+    case 'avatar':
+    case 'profile': return `${base}/profiles`;
+    default: return `${base}/general`;
+  }
+}
+
+/** Sube un buffer a Cloudinary (promesa) */
+function uploadBufferToCloudinary(file, folder) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: 'image',
+        // Opcional: forzar nombre legible (Cloudinary añadirá sufijo si existe)
+        // filename_override: file.originalname?.slice(0, 100),
+        // unique_filename: true
+      },
+      (err, result) => (err ? reject(err) : resolve(result))
+    );
+    stream.end(file.buffer);
+  });
+}
+
+/** Sube un archivo en disco a Cloudinary (dev) */
+function uploadPathToCloudinary(file, folder) {
+  return cloudinary.uploader.upload(file.path, {
+    folder,
+    resource_type: 'image'
+  });
+}
+
+/** Construye el objeto de archivo para guardar en DB */
+function buildRecordFromCloudinary(result, originalName) {
+  return {
+    filename: path.basename(result.public_id), // sin la carpeta
+    originalName: originalName,
+    url: result.secure_url,
+    publicId: result.public_id,
+    width: result.width,
+    height: result.height,
+    format: result.format,
+    provider: 'cloudinary',
+    uploadedAt: new Date()
+  };
+}
+
+function buildRecordFromLocal(file) {
+  const url = `${APP_BASE}/${(file.path || '').replace(/\\/g, '/')}`;
+  return {
+    filename: file.filename,
+    originalName: file.originalname,
+    url,
+    path: file.path,
+    mimetype: file.mimetype,
+    size: file.size,
+    provider: 'local',
+    uploadedAt: new Date()
+  };
+}
+
+/** Borra el archivo anterior (Cloudinary o local) con tolerancia */
+async function deletePreviousAsset(asset, fallbackFolder) {
+  if (!asset) return;
+  try {
+    if (asset.publicId) {
+      await deleteFromCloudinary(asset.publicId);
+    } else if (asset.filename) {
+      await deleteOldFile(asset.filename, fallbackFolder);
+    }
+  } catch (e) {
+    logger.warn('No se pudo eliminar el asset anterior', {
+      error: e?.message || String(e)
+    });
+  }
+}
+
+/** Elimina archivo local */
+const deleteOldFile = async (filename, folder) => {
+  try {
+    const uploadPath = process.env.UPLOAD_PATH || 'uploads';
+    const filePath = path.join(uploadPath, folder, filename);
+    await fs.access(filePath);
+    await fs.unlink(filePath);
+    logger.info('Archivo anterior (local) eliminado', { filename, folder });
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error; // ignora si no existe
+  }
+};
+
+/** Decide si debemos usar Cloudinary para esta request */
+function shouldUseCloudinary(file) {
+  // Requiere configuración válida y el modo Cloud (prod o STORAGE_TYPE=cloudinary)
+  if (!useCloud || !isCloudinaryConfigured()) return false;
+  // Si viene en memoria (Vercel), es ideal para Cloudinary
+  if (file?.buffer) return true;
+  // Si viene en disco pero Cloud está activo, también permitimos subir
+  if (file?.path) return true;
+  return false;
+}
+
+/* ========================= Controller ========================= */
+
 export const uploadController = {
-  
-  // ============== UPLOAD BÁSICO ==============
-  
-  // Upload de archivo general
+  /* ============== UPLOAD BÁSICO ============== */
+
   uploadFile: controllerHandler(async (req, res) => {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'No se ha enviado ningún archivo'
-      });
+      return res.status(400).json({ success: false, error: 'No se ha enviado ningún archivo' });
     }
 
-    const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
-    const fileUrl = `${baseUrl}/${req.file.path.replace(/\\/g, '/')}`;
+    let record;
 
-    logger.success('Archivo subido exitosamente', {
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
-      userId: req.user?.id
-    });
+    try {
+      if (shouldUseCloudinary(req.file)) {
+        const folder = cloudFolderFor(req.file.fieldname);
+        const result = req.file.buffer
+          ? await uploadBufferToCloudinary(req.file, folder)
+          : await uploadPathToCloudinary(req.file, folder);
 
-    res.status(200).json({
-      success: true,
-      message: 'Archivo subido exitosamente',
-      data: {
-        file: {
-          filename: req.file.filename,
-          originalName: req.file.originalname,
-          mimetype: req.file.mimetype,
-          size: req.file.size,
-          url: fileUrl,
-          path: req.file.path,
-          uploadedAt: new Date().toISOString()
-        }
+        record = buildRecordFromCloudinary(result, req.file.originalname);
+
+        // Si subimos a Cloudinary desde disco, borra el temporal
+        if (req.file.path) await cleanupTempFiles(req.file);
+      } else {
+        // Local (dev)
+        record = buildRecordFromLocal(req.file);
       }
-    });
+
+      logger.success('Archivo subido exitosamente', {
+        filename: record.filename,
+        provider: record.provider,
+        userId: req.user?.id
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Archivo subido exitosamente',
+        data: { file: record }
+      });
+    } catch (err) {
+      await cleanupTempFiles(req.file);
+      logger.error('Error subiendo archivo', { error: err?.message || err });
+      return res.status(500).json({ success: false, error: 'Error subiendo archivo' });
+    }
   }, 'Upload File'),
 
-  // ============== UPLOADS ESPECÍFICOS ==============
-  
-  // Upload de logo para negocio
+  /* ============== UPLOADS ESPECÍFICOS ============== */
+
   uploadLogo: controllerHandler(async (req, res) => {
     const { businessId } = req.params;
 
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'No se ha enviado ningún logo'
-      });
+      return res.status(400).json({ success: false, error: 'No se ha enviado ningún logo' });
     }
 
-    // Verificar que el negocio existe y pertenece al usuario
     const business = await Business.findById(businessId);
     if (!business) {
-      await cleanupTempFiles([req.file]);
-      return res.status(404).json({
-        success: false,
-        error: 'Negocio no encontrado'
-      });
+      await cleanupTempFiles(req.file);
+      return res.status(404).json({ success: false, error: 'Negocio no encontrado' });
     }
-
     if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      await cleanupTempFiles([req.file]);
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para modificar este negocio'
+      await cleanupTempFiles(req.file);
+      return res.status(403).json({ success: false, error: 'No tienes permisos para modificar este negocio' });
+    }
+
+    try {
+      // Subir nuevo logo
+      let newLogo;
+      if (shouldUseCloudinary(req.file)) {
+        const result = req.file.buffer
+          ? await uploadBufferToCloudinary(req.file, cloudFolderFor('logo'))
+          : await uploadPathToCloudinary(req.file, cloudFolderFor('logo'));
+        newLogo = buildRecordFromCloudinary(result, req.file.originalname);
+        if (req.file.path) await cleanupTempFiles(req.file);
+      } else {
+        newLogo = buildRecordFromLocal(req.file);
+      }
+
+      // Eliminar logo anterior
+      await deletePreviousAsset(business.branding?.logo, 'logos');
+
+      // Guardar en DB
+      business.branding = { ...business.branding, logo: newLogo };
+      await business.save();
+
+      logger.success('Logo actualizado exitosamente', {
+        businessId,
+        filename: newLogo.filename,
+        provider: newLogo.provider,
+        userId: req.user.id
       });
+
+      return res.json({
+        success: true,
+        message: 'Logo actualizado exitosamente',
+        data: {
+          business: { id: business._id, name: business.name },
+          logo: newLogo
+        }
+      });
+    } catch (err) {
+      await cleanupTempFiles(req.file);
+      logger.error('Error actualizando logo', { error: err?.message || err });
+      return res.status(500).json({ success: false, error: 'Error subiendo el logo' });
     }
-
-    const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
-    const logoUrl = `${baseUrl}/${req.file.path.replace(/\\/g, '/')}`;
-
-    // Eliminar logo anterior si existe
-    if (business.branding?.logo?.filename) {
-      try {
-        await deleteOldFile(business.branding.logo.filename, 'logos');
-      } catch (error) {
-        logger.warn('Error eliminando logo anterior', { error: error.message });
-      }
-    }
-
-    // Actualizar negocio con nuevo logo
-    business.branding = {
-      ...business.branding,
-      logo: {
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        url: logoUrl,
-        path: req.file.path,
-        uploadedAt: new Date()
-      }
-    };
-
-    await business.save();
-
-    logger.success('Logo actualizado exitosamente', {
-      businessId,
-      filename: req.file.filename,
-      userId: req.user.id
-    });
-
-    res.json({
-      success: true,
-      message: 'Logo actualizado exitosamente',
-      data: {
-        business: {
-          id: business._id,
-          name: business.name
-        },
-        logo: business.branding.logo
-      }
-    });
   }, 'Upload Logo'),
 
-  // Upload de portada para negocio
   uploadCover: controllerHandler(async (req, res) => {
     const { businessId } = req.params;
 
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'No se ha enviado ninguna imagen de portada'
-      });
+      return res.status(400).json({ success: false, error: 'No se ha enviado ninguna imagen de portada' });
     }
 
     const business = await Business.findById(businessId);
     if (!business) {
-      await cleanupTempFiles([req.file]);
-      return res.status(404).json({
-        success: false,
-        error: 'Negocio no encontrado'
-      });
+      await cleanupTempFiles(req.file);
+      return res.status(404).json({ success: false, error: 'Negocio no encontrado' });
     }
-
     if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      await cleanupTempFiles([req.file]);
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para modificar este negocio'
+      await cleanupTempFiles(req.file);
+      return res.status(403).json({ success: false, error: 'No tienes permisos para modificar este negocio' });
+    }
+
+    try {
+      let newCover;
+      if (shouldUseCloudinary(req.file)) {
+        const result = req.file.buffer
+          ? await uploadBufferToCloudinary(req.file, cloudFolderFor('cover'))
+          : await uploadPathToCloudinary(req.file, cloudFolderFor('cover'));
+        newCover = buildRecordFromCloudinary(result, req.file.originalname);
+        if (req.file.path) await cleanupTempFiles(req.file);
+      } else {
+        newCover = buildRecordFromLocal(req.file);
+      }
+
+      // Eliminar anterior
+      await deletePreviousAsset(business.branding?.cover, 'covers');
+
+      // Guardar
+      business.branding = { ...business.branding, cover: newCover };
+      await business.save();
+
+      logger.success('Portada actualizada exitosamente', {
+        businessId,
+        filename: newCover.filename,
+        provider: newCover.provider,
+        userId: req.user.id
       });
+
+      return res.json({
+        success: true,
+        message: 'Portada actualizada exitosamente',
+        data: {
+          business: { id: business._id, name: business.name },
+          cover: newCover
+        }
+      });
+    } catch (err) {
+      await cleanupTempFiles(req.file);
+      logger.error('Error actualizando portada', { error: err?.message || err });
+      return res.status(500).json({ success: false, error: 'Error subiendo la portada' });
     }
-
-    const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
-    const coverUrl = `${baseUrl}/${req.file.path.replace(/\\/g, '/')}`;
-
-    // Eliminar portada anterior
-    if (business.branding?.cover?.filename) {
-      try {
-        await deleteOldFile(business.branding.cover.filename, 'covers');
-      } catch (error) {
-        logger.warn('Error eliminando portada anterior', { error: error.message });
-      }
-    }
-
-    // Actualizar negocio
-    business.branding = {
-      ...business.branding,
-      cover: {
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        url: coverUrl,
-        path: req.file.path,
-        uploadedAt: new Date()
-      }
-    };
-
-    await business.save();
-
-    logger.success('Portada actualizada exitosamente', {
-      businessId,
-      filename: req.file.filename,
-      userId: req.user.id
-    });
-
-    res.json({
-      success: true,
-      message: 'Portada actualizada exitosamente',
-      data: {
-        business: {
-          id: business._id,
-          name: business.name
-        },
-        cover: business.branding.cover
-      }
-    });
   }, 'Upload Cover'),
 
-  // Upload de galería para negocio
   uploadGallery: controllerHandler(async (req, res) => {
     const { businessId } = req.params;
-    const { replace = false } = req.body; // Si reemplazar toda la galería
+    const { replace = false } = req.body;
 
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'No se han enviado imágenes para la galería'
-      });
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length) {
+      return res.status(400).json({ success: false, error: 'No se han enviado imágenes para la galería' });
     }
 
     const business = await Business.findById(businessId);
     if (!business) {
-      await cleanupTempFiles(req.files);
-      return res.status(404).json({
-        success: false,
-        error: 'Negocio no encontrado'
-      });
+      await cleanupTempFiles(files);
+      return res.status(404).json({ success: false, error: 'Negocio no encontrado' });
     }
-
     if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      await cleanupTempFiles(req.files);
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para modificar este negocio'
-      });
+      await cleanupTempFiles(files);
+      return res.status(403).json({ success: false, error: 'No tienes permisos para modificar este negocio' });
     }
 
-    const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
+    try {
+      // Subidas (Cloudinary o local)
+      let newImages = [];
 
-    // Procesar archivos subidos
-    const newImages = req.files.map((file, index) => ({
-      filename: file.filename,
-      originalName: file.originalname,
-      url: `${baseUrl}/${file.path.replace(/\\/g, '/')}`,
-      path: file.path,
-      order: business.content?.gallery?.length + index || index,
-      uploadedAt: new Date()
-    }));
+      if (shouldUseCloudinary(files[0])) {
+        const folder = cloudFolderFor('gallery');
+        const results = await Promise.all(
+          files.map((f) =>
+            f.buffer ? uploadBufferToCloudinary(f, folder) : uploadPathToCloudinary(f, folder)
+          )
+        );
+        newImages = results.map((r, idx) => ({
+          ...buildRecordFromCloudinary(r, files[idx].originalname),
+          order: (business.content?.gallery?.length || 0) + idx
+        }));
 
-    // Gestionar galería existente
-    let currentGallery = business.content?.gallery || [];
-
-    if (replace === 'true' || replace === true) {
-      // Eliminar imágenes anteriores
-      if (currentGallery.length > 0) {
-        try {
-          await Promise.all(
-            currentGallery.map(img => deleteOldFile(img.filename, 'gallery'))
-          );
-        } catch (error) {
-          logger.warn('Error eliminando galería anterior', { error: error.message });
-        }
+        // limpiar temporales si venían de disco
+        await cleanupTempFiles(files);
+      } else {
+        newImages = files.map((f, idx) => ({
+          ...buildRecordFromLocal(f),
+          order: (business.content?.gallery?.length || 0) + idx
+        }));
       }
-      currentGallery = newImages;
-    } else {
-      // Agregar a la galería existente
-      currentGallery = [...currentGallery, ...newImages];
-    }
 
-    // Validar límite de imágenes
-    const maxGalleryImages = UPLOAD_CONFIG.gallery.maxFiles;
-    if (currentGallery.length > maxGalleryImages) {
-      await cleanupTempFiles(req.files);
-      return res.status(400).json({
-        success: false,
-        error: `La galería no puede tener más de ${maxGalleryImages} imágenes`
-      });
-    }
-
-    // Actualizar negocio
-    business.content = {
-      ...business.content,
-      gallery: currentGallery
-    };
-
-    await business.save();
-
-    logger.success('Galería actualizada exitosamente', {
-      businessId,
-      imagesAdded: req.files.length,
-      totalImages: currentGallery.length,
-      userId: req.user.id
-    });
-
-    res.json({
-      success: true,
-      message: 'Galería actualizada exitosamente',
-      data: {
-        business: {
-          id: business._id,
-          name: business.name
-        },
-        gallery: currentGallery,
-        stats: {
-          imagesAdded: req.files.length,
-          totalImages: currentGallery.length,
-          replaced: replace === 'true' || replace === true
-        }
+      // Reemplazar o agregar
+      let currentGallery = business.content?.gallery || [];
+      if (replace === 'true' || replace === true) {
+        // Eliminar existentes
+        await Promise.all(
+          currentGallery.map((img) =>
+            img.publicId ? deleteFromCloudinary(img.publicId) : deleteOldFile(img.filename, 'gallery')
+          )
+        );
+        currentGallery = newImages;
+      } else {
+        currentGallery = [...currentGallery, ...newImages];
       }
-    });
+
+      // Validar límite
+      const max = UPLOAD_CONFIG.gallery.maxFiles;
+      if (currentGallery.length > max) {
+        // si te pasaste, borra las nuevas que estaban en Cloudinary
+        await Promise.all(
+          newImages.map((img) =>
+            img.publicId ? deleteFromCloudinary(img.publicId) : deleteOldFile(img.filename, 'gallery')
+          )
+        );
+        return res.status(400).json({
+          success: false,
+          error: `La galería no puede tener más de ${max} imágenes`
+        });
+      }
+
+      // Guardar
+      business.content = { ...business.content, gallery: currentGallery };
+      await Business.updateOne({ _id: business._id }, { $set: { content: business.content } });
+
+      logger.success('Galería actualizada exitosamente', {
+        businessId,
+        imagesAdded: newImages.length,
+        totalImages: currentGallery.length,
+        userId: req.user.id
+      });
+
+      return res.json({
+        success: true,
+        message: 'Galería actualizada exitosamente',
+        data: {
+          business: { id: business._id, name: business.name },
+          gallery: currentGallery,
+          stats: {
+            imagesAdded: newImages.length,
+            totalImages: currentGallery.length,
+            replaced: replace === 'true' || replace === true
+          }
+        }
+      });
+    } catch (err) {
+      await cleanupTempFiles(files);
+      logger.error('Error actualizando galería', { error: err?.message || err });
+      return res.status(500).json({ success: false, error: 'Error subiendo la galería' });
+    }
   }, 'Upload Gallery'),
 
-  // ============== GESTIÓN DE ARCHIVOS ==============
-  
-  // Eliminar archivo específico de galería
+  /* ============== GESTIÓN DE ARCHIVOS ============== */
+
   deleteGalleryImage: controllerHandler(async (req, res) => {
     const { businessId, filename } = req.params;
 
     const business = await Business.findById(businessId);
     if (!business) {
-      return res.status(404).json({
-        success: false,
-        error: 'Negocio no encontrado'
-      });
+      return res.status(404).json({ success: false, error: 'Negocio no encontrado' });
     }
-
     if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para modificar este negocio'
-      });
+      return res.status(403).json({ success: false, error: 'No tienes permisos para modificar este negocio' });
     }
 
     const gallery = business.content?.gallery || [];
-    const imageIndex = gallery.findIndex(img => img.filename === filename);
-
-    if (imageIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        error: 'Imagen no encontrada en la galería'
-      });
+    const idx = gallery.findIndex((img) => img.filename === filename);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, error: 'Imagen no encontrada en la galería' });
     }
 
-    // Eliminar archivo físico
+    const img = gallery[idx];
+
     try {
-      await deleteOldFile(filename, 'gallery');
-    } catch (error) {
-      logger.warn('Error eliminando archivo físico', { error: error.message });
+      if (img.publicId) {
+        await deleteFromCloudinary(img.publicId);
+      } else {
+        await deleteOldFile(filename, 'gallery');
+      }
+    } catch (e) {
+      logger.warn('Error eliminando archivo físico', { error: e?.message || e });
     }
 
-    // Remover de la galería
-    gallery.splice(imageIndex, 1);
-    
-    // Reordenar índices
-    gallery.forEach((img, index) => {
-      img.order = index;
-    });
-
+    gallery.splice(idx, 1);
+    // Reordenar
+    gallery.forEach((g, i) => (g.order = i));
     business.content.gallery = gallery;
     await business.save();
 
@@ -362,102 +444,63 @@ export const uploadController = {
       userId: req.user.id
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Imagen eliminada exitosamente',
       data: {
-        gallery: gallery,
+        gallery,
         remainingImages: gallery.length
       }
     });
   }, 'Delete Gallery Image'),
 
-  // Reordenar imágenes de galería
   reorderGallery: controllerHandler(async (req, res) => {
     const { businessId } = req.params;
-    const { imageOrder } = req.body; // Array de filenames en el orden deseado
+    const { imageOrder } = req.body;
 
     if (!Array.isArray(imageOrder)) {
-      return res.status(400).json({
-        success: false,
-        error: 'El orden debe ser un array de nombres de archivo'
-      });
+      return res.status(400).json({ success: false, error: 'El orden debe ser un array de nombres de archivo' });
     }
 
     const business = await Business.findById(businessId);
     if (!business) {
-      return res.status(404).json({
-        success: false,
-        error: 'Negocio no encontrado'
-      });
+      return res.status(404).json({ success: false, error: 'Negocio no encontrado' });
     }
-
     if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para modificar este negocio'
-      });
+      return res.status(403).json({ success: false, error: 'No tienes permisos para modificar este negocio' });
     }
 
     const gallery = business.content?.gallery || [];
-    
-    // Validar que todos los filenames existen
-    const galleryFilenames = gallery.map(img => img.filename);
-    const invalidFilenames = imageOrder.filter(filename => !galleryFilenames.includes(filename));
-    
-    if (invalidFilenames.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: `Archivos no encontrados: ${invalidFilenames.join(', ')}`
-      });
+    const existing = new Set(gallery.map((img) => img.filename));
+    const invalid = imageOrder.filter((f) => !existing.has(f));
+    if (invalid.length) {
+      return res.status(400).json({ success: false, error: `Archivos no encontrados: ${invalid.join(', ')}` });
     }
 
-    // Reordenar galería
-    const reorderedGallery = imageOrder.map((filename, index) => {
-      const image = gallery.find(img => img.filename === filename);
-      return {
-        ...image,
-        order: index
-      };
+    const reordered = imageOrder.map((f, i) => {
+      const img = gallery.find((g) => g.filename === f);
+      return { ...img, order: i };
     });
 
-    business.content.gallery = reorderedGallery;
+    business.content.gallery = reordered;
     await business.save();
 
-    logger.success('Galería reordenada', {
-      businessId,
-      newOrder: imageOrder,
-      userId: req.user.id
-    });
+    logger.success('Galería reordenada', { businessId, newOrder: imageOrder, userId: req.user.id });
 
-    res.json({
-      success: true,
-      message: 'Galería reordenada exitosamente',
-      data: {
-        gallery: reorderedGallery
-      }
-    });
+    return res.json({ success: true, message: 'Galería reordenada exitosamente', data: { gallery: reordered } });
   }, 'Reorder Gallery'),
 
-  // ============== INFORMACIÓN DE ARCHIVOS ==============
-  
-  // Obtener información de uploads de un negocio
+  /* ============== INFORMACIÓN / UTILIDADES ============== */
+
   getBusinessUploads: controllerHandler(async (req, res) => {
     const { businessId } = req.params;
 
     const business = await Business.findById(businessId);
     if (!business) {
-      return res.status(404).json({
-        success: false,
-        error: 'Negocio no encontrado'
-      });
+      return res.status(404).json({ success: false, error: 'Negocio no encontrado' });
     }
-
     if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'No tienes permisos para ver estos archivos'
-      });
+      return res.status(403).json({ success: false, error: 'No tienes permisos para ver estos archivos' });
     }
 
     const uploads = {
@@ -471,40 +514,21 @@ export const uploadController = {
       }
     };
 
-    // Calcular estadísticas
     let totalFiles = 0;
-    let totalSize = 0;
-
-    if (uploads.logo) {
-      totalFiles++;
-      // El tamaño se puede obtener del archivo si está disponible
-    }
-
-    if (uploads.cover) {
-      totalFiles++;
-    }
-
+    if (uploads.logo) totalFiles++;
+    if (uploads.cover) totalFiles++;
     totalFiles += uploads.gallery.length;
     uploads.stats.totalFiles = totalFiles;
 
-    res.json({
-      success: true,
-      data: uploads
-    });
+    return res.json({ success: true, data: uploads });
   }, 'Get Business Uploads'),
 
-  // ============== UTILIDADES ==============
-  
-  // Optimizar imagen (si se usa Cloudinary)
   optimizeImage: controllerHandler(async (req, res) => {
     const { filename } = req.params;
     const { width, height, quality = 'auto', format = 'auto' } = req.query;
 
     if (!isCloudinaryConfigured()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Optimización de imágenes no disponible'
-      });
+      return res.status(400).json({ success: false, error: 'Optimización de imágenes no disponible' });
     }
 
     try {
@@ -515,7 +539,7 @@ export const uploadController = {
         format
       });
 
-      res.json({
+      return res.json({
         success: true,
         data: {
           originalFilename: filename,
@@ -524,33 +548,13 @@ export const uploadController = {
         }
       });
     } catch (error) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         error: 'Error optimizando imagen',
         details: error.message
       });
     }
   }, 'Optimize Image')
-};
-
-// ============== FUNCIONES AUXILIARES ==============
-
-// Función para eliminar archivos antiguos
-const deleteOldFile = async (filename, folder) => {
-  try {
-    const uploadPath = process.env.UPLOAD_PATH || 'uploads';
-    const filePath = path.join(uploadPath, folder, filename);
-    
-    await fs.access(filePath);
-    await fs.unlink(filePath);
-    
-    logger.info('Archivo anterior eliminado', { filename, folder });
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
-    }
-    // Archivo no existe, no es un error
-  }
 };
 
 export default uploadController;

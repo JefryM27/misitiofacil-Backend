@@ -1,10 +1,17 @@
+// src/config/storage/multer.js
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 
-// Configuración de tipos de archivos y límites
-const UPLOAD_CONFIG = {
+const isProd = process.env.NODE_ENV === 'production';
+const storageType = (process.env.STORAGE_TYPE || '').toLowerCase(); // 'cloudinary' | 'local' | ''
+const useMemory = isProd || storageType === 'cloudinary';           // Vercel: true
+
+// ---------------------------------------------
+// Config de tipos y límites
+// ---------------------------------------------
+export const UPLOAD_CONFIG = {
   images: {
     mimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'],
     maxSize: parseInt(process.env.UPLOAD_MAX_FILE_SIZE) || 2 * 1024 * 1024, // 2MB
@@ -12,22 +19,39 @@ const UPLOAD_CONFIG = {
   },
   logos: {
     mimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
-    maxSize: 1 * 1024 * 1024, // 1MB para logos
+    maxSize: 1 * 1024 * 1024, // 1MB
     maxFiles: 1
   },
   covers: {
     mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-    maxSize: 3 * 1024 * 1024, // 3MB para portadas
+    maxSize: 3 * 1024 * 1024, // 3MB
     maxFiles: 1
   },
   gallery: {
     mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
     maxSize: 2 * 1024 * 1024, // 2MB
-    maxFiles: 10 // Máximo 10 imágenes en galería
+    maxFiles: 10
   }
 };
 
-// Función para asegurar que las carpetas existan
+// ---------------------------------------------
+// Paths y utilidades
+// ---------------------------------------------
+const baseUploadPath = process.env.UPLOAD_PATH || 'uploads';
+
+const getDestinationPath = (fieldname) => {
+  switch ((fieldname || '').toLowerCase()) {
+    case 'logo': return `${baseUploadPath}/logos/`;
+    case 'cover':
+    case 'portada': return `${baseUploadPath}/covers/`;
+    case 'gallery':
+    case 'galeria': return `${baseUploadPath}/gallery/`;
+    case 'avatar':
+    case 'profile': return `${baseUploadPath}/profiles/`;
+    default: return `${baseUploadPath}/general/`;
+  }
+};
+
 const ensureDir = async (dir) => {
   try {
     await fs.access(dir);
@@ -37,95 +61,135 @@ const ensureDir = async (dir) => {
   }
 };
 
-// Función para obtener la ruta de destino según el tipo de archivo
-const getDestinationPath = (fieldname) => {
-  const basePath = process.env.UPLOAD_PATH || 'uploads';
-  
-  switch (fieldname) {
-    case 'logo':
-      return `${basePath}/logos/`;
-    case 'cover':
-    case 'portada':
-      return `${basePath}/covers/`;
-    case 'gallery':
-    case 'galeria':
-      return `${basePath}/gallery/`;
-    case 'avatar':
-    case 'profile':
-      return `${basePath}/profiles/`;
-    default:
-      return `${basePath}/general/`;
-  }
+const sanitizeName = (name = '') =>
+  name.replace(/[^a-zA-Z0-9.\-_]/g, '_').substring(0, 120);
+
+const generateFilename = (file) => {
+  const ext = path.extname(file.originalname || '').toLowerCase() || '';
+  return `${file.fieldname || 'file'}-${Date.now()}-${uuidv4()}${ext}`;
 };
 
-// Configuración de almacenamiento
-const storage = multer.diskStorage({
-  destination: async function (req, file, cb) {
+// ---------------------------------------------
+// FileFilter con validación + metadata
+// - Valida mimetype por "type" (images, logos, ...)
+// - Precalcula filename y path; llena req.uploadedFiles
+// ---------------------------------------------
+const createFileFilter = (type = 'images') => {
+  const cfg = UPLOAD_CONFIG[type];
+  if (!cfg) throw new Error(`Tipo de configuración no válido: ${type}`);
+
+  return (req, file, cb) => {
+    // 1) Validación de mimetype
+    if (!cfg.mimeTypes.includes(file.mimetype)) {
+      const allowed = cfg.mimeTypes.join(', ');
+      return cb(new Error(`Tipo de archivo no válido para ${type}. Permitidos: ${allowed}`), false);
+    }
+
+    // 2) Metadata consistente (para disk y memory)
+    const uploadDir = getDestinationPath(file.fieldname);
+    const filename = generateFilename(file);
+
+    // Guardar en propiedades internas para que storage las reutilice
+    file.__generatedFilename = filename;
+    file.__uploadDir = uploadDir;
+
+    // Exponer metadata "tipo legacy" para tu código
+    if (!req.uploadedFiles) req.uploadedFiles = [];
+    req.uploadedFiles.push({
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      filename,
+      path: useMemory ? null : uploadDir + filename, // en memory no hay path en disco
+      mimetype: file.mimetype,
+      inMemory: useMemory
+    });
+
+    cb(null, true);
+  };
+};
+
+// ---------------------------------------------
+// Storages
+// - En prod/cloudinary: memoryStorage
+// - En dev/local: diskStorage (asegura directorios)
+// ---------------------------------------------
+const memoryStorage = multer.memoryStorage();
+
+const diskStorage = multer.diskStorage({
+  destination: async (req, file, cb) => {
     try {
-      const uploadPath = getDestinationPath(file.fieldname);
-      await ensureDir(uploadPath);
-      cb(null, uploadPath);
-    } catch (error) {
-      console.error('❌ Error creando directorio de upload:', error);
-      cb(error);
+      const dest = file.__uploadDir || getDestinationPath(file.fieldname);
+      await ensureDir(dest);
+      cb(null, dest);
+    } catch (err) {
+      console.error('❌ Error creando directorio de upload:', err);
+      cb(err);
     }
   },
-  filename: function (req, file, cb) {
+  filename: (req, file, cb) => {
     try {
-      const uniqueSuffix = uuidv4();
-      const timestamp = Date.now();
-      const ext = path.extname(file.originalname).toLowerCase();
-      const sanitizedOriginalName = file.originalname
-        .replace(/[^a-zA-Z0-9]/g, '_')
-        .substring(0, 50); // Limitar longitud
-      
-      const filename = `${file.fieldname}-${timestamp}-${uniqueSuffix}${ext}`;
-      
-      // Agregar metadata al request para uso posterior
-      if (!req.uploadedFiles) req.uploadedFiles = [];
-      req.uploadedFiles.push({
-        fieldname: file.fieldname,
-        originalname: file.originalname,
-        filename: filename,
-        path: getDestinationPath(file.fieldname) + filename
-      });
-      
-      cb(null, filename);
-    } catch (error) {
-      console.error('❌ Error generando nombre de archivo:', error);
-      cb(error);
+      const name = sanitizeName(file.__generatedFilename || generateFilename(file));
+      // Actualiza también el objeto en req.uploadedFiles si existe
+      if (req.uploadedFiles && Array.isArray(req.uploadedFiles)) {
+        const meta = req.uploadedFiles.find(
+          (m) => m.originalname === file.originalname && m.fieldname === file.fieldname
+        );
+        if (meta) {
+          meta.filename = name;
+          meta.path = (file.__uploadDir || getDestinationPath(file.fieldname)) + name;
+        }
+      }
+      cb(null, name);
+    } catch (err) {
+      console.error('❌ Error generando nombre de archivo:', err);
+      cb(err);
     }
   }
 });
 
-// Función para crear filtro de archivos específico
-const createFileFilter = (type = 'images') => {
-  return (req, file, cb) => {
-    const config = UPLOAD_CONFIG[type];
-    
-    if (!config) {
-      return cb(new Error(`Tipo de configuración no válido: ${type}`), false);
+// El storage efectivo según entorno
+const storage = useMemory ? memoryStorage : diskStorage;
+
+// ---------------------------------------------
+// Factory de uploaders por tipo
+// ---------------------------------------------
+const createUploader = (type) => {
+  const cfg = UPLOAD_CONFIG[type];
+  return multer({
+    storage,
+    fileFilter: createFileFilter(type),
+    limits: {
+      fileSize: cfg.maxSize,
+      files: cfg.maxFiles
     }
-    
-    // Verificar tipo MIME
-    if (config.mimeTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      const allowedTypes = config.mimeTypes.join(', ');
-      cb(new Error(`Tipo de archivo no válido para ${type}. Permitidos: ${allowedTypes}`), false);
-    }
-  };
+  });
 };
 
-// Middleware para validar el tamaño total de archivos múltiples
-const validateTotalSize = (maxTotalSize) => {
+// Exporta instancias compatibles con tu código anterior
+export const uploadImage = createUploader('images');
+export const uploadLogo = createUploader('logos');
+export const uploadCover = createUploader('covers');
+export const uploadGallery = createUploader('gallery');
+
+// Backward compatibility
+export const upload = uploadImage;
+
+// ---------------------------------------------
+// Middleware: validar tamaño total (cuando uses array())
+// ---------------------------------------------
+export const validateTotalSize = (maxTotalSize) => {
   return (req, res, next) => {
-    if (req.files && Array.isArray(req.files)) {
-      const totalSize = req.files.reduce((sum, file) => sum + file.size, 0);
-      if (totalSize > maxTotalSize) {
+    // Soporta tanto req.files (array) como req.files[field]
+    const files = Array.isArray(req.files)
+      ? req.files
+      : Object.values(req.files || {}).flat();
+
+    if (files?.length) {
+      const total = files.reduce((sum, f) => sum + (f.size || 0), 0);
+      if (total > maxTotalSize) {
         return res.status(400).json({
           error: 'Total file size exceeded',
-          message: `El tamaño total de archivos excede el límite de ${maxTotalSize / (1024 * 1024)}MB`
+          message: `El tamaño total de archivos excede ${Math.round(maxTotalSize / (1024 * 1024))}MB`
         });
       }
     }
@@ -133,70 +197,27 @@ const validateTotalSize = (maxTotalSize) => {
   };
 };
 
-// Configuraciones de upload específicas
-export const uploadImage = multer({
-  storage,
-  fileFilter: createFileFilter('images'),
-  limits: {
-    fileSize: UPLOAD_CONFIG.images.maxSize,
-    files: UPLOAD_CONFIG.images.maxFiles
-  }
-});
-
-export const uploadLogo = multer({
-  storage,
-  fileFilter: createFileFilter('logos'),
-  limits: {
-    fileSize: UPLOAD_CONFIG.logos.maxSize,
-    files: UPLOAD_CONFIG.logos.maxFiles
-  }
-});
-
-export const uploadCover = multer({
-  storage,
-  fileFilter: createFileFilter('covers'),
-  limits: {
-    fileSize: UPLOAD_CONFIG.covers.maxSize,
-    files: UPLOAD_CONFIG.covers.maxFiles
-  }
-});
-
-export const uploadGallery = multer({
-  storage,
-  fileFilter: createFileFilter('gallery'),
-  limits: {
-    fileSize: UPLOAD_CONFIG.gallery.maxSize,
-    files: UPLOAD_CONFIG.gallery.maxFiles
-  }
-});
-
-// Upload general (backward compatibility)
-export const upload = uploadImage;
-
-// Middleware para manejo de errores de Multer
+// ---------------------------------------------
+// Errores de Multer
+// ---------------------------------------------
 export const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     switch (err.code) {
       case 'LIMIT_FILE_SIZE':
         return res.status(400).json({
           error: 'File too large',
-          message: 'El archivo excede el tamaño máximo permitido',
-          maxSize: `${err.field ? UPLOAD_CONFIG[err.field]?.maxSize || UPLOAD_CONFIG.images.maxSize : UPLOAD_CONFIG.images.maxSize} bytes`
+          message: 'El archivo excede el tamaño máximo permitido'
         });
-      
       case 'LIMIT_FILE_COUNT':
         return res.status(400).json({
           error: 'Too many files',
-          message: 'Demasiados archivos subidos',
-          maxFiles: UPLOAD_CONFIG.images.maxFiles
+          message: 'Demasiados archivos subidos'
         });
-      
       case 'LIMIT_UNEXPECTED_FILE':
         return res.status(400).json({
           error: 'Unexpected field',
           message: `Campo de archivo inesperado: ${err.field}`
         });
-      
       default:
         return res.status(400).json({
           error: 'Upload error',
@@ -204,16 +225,11 @@ export const handleMulterError = (err, req, res, next) => {
         });
     }
   }
-  
-  // Errores personalizados (tipo de archivo, etc.)
-  if (err.message.includes('Tipo de archivo no válido')) {
-    return res.status(400).json({
-      error: 'Invalid file type',
-      message: err.message
-    });
+
+  if (err?.message?.includes?.('Tipo de archivo no válido')) {
+    return res.status(400).json({ error: 'Invalid file type', message: err.message });
   }
-  
-  // Error genérico
+
   console.error('❌ Error de upload no manejado:', err);
   return res.status(500).json({
     error: 'Internal upload error',
@@ -221,32 +237,38 @@ export const handleMulterError = (err, req, res, next) => {
   });
 };
 
-// Función utilitaria para limpiar archivos huérfanos
+// ---------------------------------------------
+// Limpieza de temporales (solo dev/disk)
+// ---------------------------------------------
 export const cleanupTempFiles = async (files) => {
   if (!files) return;
-  
-  const filesToDelete = Array.isArray(files) ? files : [files];
-  
-  for (const file of filesToDelete) {
+
+  const arr = Array.isArray(files)
+    ? files
+    : Object.values(files).flat();
+
+  for (const file of arr) {
     try {
-      const filePath = file.path || file.destination + file.filename;
-      await fs.unlink(filePath);
-      console.log(`🗑️ Archivo temporal eliminado: ${filePath}`);
+      // En memoryStorage no hay path que borrar
+      if (!file?.path) continue;
+      await fs.unlink(file.path);
+      console.log(`🗑️ Archivo temporal eliminado: ${file.path}`);
     } catch (error) {
       console.error(`❌ Error eliminando archivo temporal: ${error.message}`);
     }
   }
 };
 
-// Exportar configuraciones para uso directo
-export { UPLOAD_CONFIG, validateTotalSize };
-
+// ---------------------------------------------
+// Export default (comodidad)
+// ---------------------------------------------
 export default {
   upload,
   uploadImage,
   uploadLogo,
   uploadCover,
   uploadGallery,
+  validateTotalSize,
   handleMulterError,
   cleanupTempFiles,
   UPLOAD_CONFIG

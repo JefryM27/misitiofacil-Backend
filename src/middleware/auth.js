@@ -139,7 +139,7 @@ export const generateToken = (user) => {
     id: user.id || user._id,
     email: user.email,
     role: user.role,
-    ...(user.businessId && { businessId: user.businessId })
+    ...(user.businessId ? { businessId: user.businessId } : {})
   };
 
   return jwt.sign(

@@ -178,7 +178,7 @@ export const errorHandler = (error, req, res, next) => {
     err = handleMongoError(err);
   } else if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
     err = handleJWTError(err);
-  } else if (err.code && err.code.startsWith('LIMIT_')) {
+  } else if (err.code && typeof err.code === 'string' && err.code.startsWith('LIMIT_')) {
     err = handleMulterError(err);
   }
 

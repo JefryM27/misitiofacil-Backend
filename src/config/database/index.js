@@ -1,139 +1,165 @@
+// src/config/database/index.js
 import { connectMongoDB } from './mongodb.js';
-import { connectPostgreSQL, testPostgreSQLConnection, closePostgreSQL } from './postgresql.js';
-import { sequelize } from './postgresql.js';
+import {
+  connectPostgreSQL,
+  testPostgreSQLConnection,
+  closePostgreSQL,
+  sequelize,
+} from './postgresql.js';
 
-// Función principal para conectar todas las bases de datos
+/**
+ * Conecta todas las bases de datos requeridas por la app.
+ * - MongoDB (obligatorio)
+ * - PostgreSQL (opcional si hay variables configuradas)
+ */
 export const connectDatabases = async () => {
   const results = {
     mongodb: false,
-    postgresql: false
+    postgresql: false,
   };
 
   try {
-    // Conectar MongoDB (obligatorio)
     console.log('🚀 Iniciando conexiones a bases de datos...');
     console.log('📍 Conectando a MongoDB Atlas...');
-    
-    // ✅ CORRECCIÓN: Manejo específico de errores de MongoDB
+
+    // ✅ Manejo específico de errores para MongoDB
     try {
       await connectMongoDB();
       results.mongodb = true;
       console.log('✅ MongoDB: Conectado exitosamente');
     } catch (mongoError) {
       console.error('❌ MongoDB: Error de conexión');
-      console.error('📋 Detalles:', mongoError.message);
-      
-      // Diagnóstico específico sin debug extenso
-      if (mongoError.message.includes('authentication failed')) {
+      console.error('📋 Detalles:', mongoError?.message || mongoError);
+
+      // Diagnóstico rápido
+      const msg = mongoError?.message || '';
+      if (msg.includes('authentication failed')) {
         console.error('💡 Revisa username/password en MongoDB Atlas');
       }
-      
-      if (mongoError.message.includes('IP') || mongoError.message.includes('not allowed')) {
+      if (msg.includes('IP') || msg.includes('not allowed')) {
         console.error('💡 Agrega tu IP en Network Access (MongoDB Atlas)');
       }
-      
-      if (mongoError.message.includes('ENOTFOUND')) {
+      if (msg.includes('ENOTFOUND')) {
         console.error('💡 Verifica conexión a internet y que el cluster esté activo');
       }
-      
-      // Re-lanzar el error
+
+      // MongoDB es obligatorio: re-lanzar
       throw mongoError;
     }
 
-    // Conectar PostgreSQL (opcional, si está configurado)
+    // PostgreSQL (opcional)
     if (process.env.POSTGRES_HOST && process.env.POSTGRES_DB) {
       try {
         await connectPostgreSQL();
         results.postgresql = true;
         console.log('✅ PostgreSQL: Conectado');
-      } catch (error) {
+      } catch (pgErr) {
         console.warn('⚠️ PostgreSQL: No se pudo conectar, continuando sin reportes avanzados');
-        console.warn('   Razón:', error.message);
+        console.warn('   Razón:', pgErr?.message || pgErr);
       }
     } else {
       console.log('ℹ️ PostgreSQL: No configurado, omitiendo conexión');
     }
 
-    // Resumen de conexiones
+    // Resumen
     console.log('\n📊 Estado final de las bases de datos:');
     console.log(`   - MongoDB: ${results.mongodb ? '✅ Activa' : '❌ Inactiva'}`);
     console.log(`   - PostgreSQL: ${results.postgresql ? '✅ Activa' : '⚠️ Inactiva'}`);
-    
+
     if (!results.mongodb) {
       throw new Error('MongoDB es requerido para el funcionamiento de la aplicación');
     }
 
     return results;
-
   } catch (error) {
-    console.error('❌ Error crítico conectando bases de datos:', error.message);
-    
-    // Sugerencias rápidas basadas en el error
-    if (error.message.includes('authentication')) {
+    console.error('❌ Error crítico conectando bases de datos:', error?.message || error);
+
+    const msg = error?.message || '';
+    if (msg.includes('authentication')) {
       console.error('🔧 Ve a MongoDB Atlas → Database Access → Verifica credenciales');
     }
-    
-    if (error.message.includes('IP') || error.message.includes('not allowed')) {
+    if (msg.includes('IP') || msg.includes('not allowed')) {
       console.error('🔧 Ve a MongoDB Atlas → Network Access → Agrega tu IP');
     }
-    
+
     throw error;
   }
 };
 
-// Función para cerrar todas las conexiones
+/**
+ * Cierra todas las conexiones de base de datos de forma segura.
+ * Incluye guards para evitar TypeError al cerrar conexiones inexistentes.
+ */
 export const closeDatabases = async () => {
-  const promises = [];
+  const tasks = [];
 
-  // Cerrar MongoDB
-  promises.push(
-    import('mongoose').then(mongoose => mongoose.connection.close())
-      .catch(err => console.error('Error cerrando MongoDB:', err))
+  // 🔒 Cerrar MongoDB (Mongoose) con import dinámico y guard
+  tasks.push(
+    (async () => {
+      try {
+        const { default: mongoose } = await import('mongoose');
+        // readyState: 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
+        const state = mongoose?.connection?.readyState;
+        if (typeof state === 'number' && state !== 0) {
+          await mongoose.connection.close(false); // false = no force
+          console.log('🛑 MongoDB cerrado');
+        } else {
+          console.log('ℹ️ MongoDB no estaba conectado; nada que cerrar.');
+        }
+      } catch (err) {
+        console.error('Error cerrando MongoDB:', err?.message || err);
+      }
+    })()
   );
 
-  // Cerrar PostgreSQL si está conectado
+  // 🔒 Cerrar PostgreSQL si está configurado
   if (process.env.POSTGRES_HOST) {
-    promises.push(
-      closePostgreSQL().catch(err => console.error('Error cerrando PostgreSQL:', err))
+    tasks.push(
+      closePostgreSQL().catch((err) =>
+        console.error('Error cerrando PostgreSQL:', err?.message || err)
+      )
     );
   }
 
-  await Promise.all(promises);
+  // ✅ No revienta si uno de los cierres falla
+  await Promise.allSettled(tasks);
   console.log('🔒 Todas las conexiones de base de datos cerradas');
 };
 
-// Función para verificar el estado de las conexiones
+/**
+ * Verifica el estado de salud de las conexiones.
+ * Devuelve flags por motor y un timestamp ISO.
+ */
 export const checkDatabaseHealth = async () => {
   const health = {
     mongodb: false,
     postgresql: false,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 
   try {
-    // Verificar MongoDB
-    const mongoose = await import('mongoose');
-    health.mongodb = mongoose.connection.readyState === 1;
-    
-    // Verificar PostgreSQL
+    // Estado MongoDB (mongoose)
+    const { default: mongoose } = await import('mongoose');
+    health.mongodb = mongoose?.connection?.readyState === 1;
+
+    // Estado PostgreSQL
     if (process.env.POSTGRES_HOST) {
       health.postgresql = await testPostgreSQLConnection();
     }
-
-    return health;
   } catch (error) {
-    console.error('Error verificando salud de bases de datos:', error);
-    return health;
+    console.error('Error verificando salud de bases de datos:', error?.message || error);
   }
+
+  return health;
 };
 
-// Exportaciones para uso directo
-export { 
-  connectMongoDB, 
-  connectPostgreSQL, 
+// Re-exportaciones para uso directo en otras capas
+export {
+  connectMongoDB,
+  connectPostgreSQL,
   testPostgreSQLConnection,
   closePostgreSQL,
-  sequelize 
+  sequelize,
 };
 
 export default connectDatabases;
