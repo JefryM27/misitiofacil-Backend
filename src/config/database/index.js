@@ -1,11 +1,26 @@
 // src/config/database/index.js
 import { connectMongoDB } from './mongodb.js';
-import {
-  connectPostgreSQL,
-  testPostgreSQLConnection,
-  closePostgreSQL,
-  sequelize,
-} from './postgresql.js';
+import { connectPostgreSQL, closePostgreSQL } from './postgresql.js';
+
+/** Detecta si Postgres está configurado por URL o por host/db */
+const isPgConfigured = Boolean(
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  (process.env.POSTGRES_HOST && process.env.POSTGRES_DB)
+);
+
+/** Probadita rápida de PG sin romper si no está configurado */
+async function testPgConnection() {
+  if (!isPgConfigured) return false;
+  try {
+    const sequelize = await connectPostgreSQL(); // devuelve instancia
+    if (!sequelize) return false;
+    await sequelize.authenticate();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Conecta todas las bases de datos requeridas por la app.
@@ -13,16 +28,13 @@ import {
  * - PostgreSQL (opcional si hay variables configuradas)
  */
 export const connectDatabases = async () => {
-  const results = {
-    mongodb: false,
-    postgresql: false,
-  };
+  const results = { mongodb: false, postgresql: false };
 
   try {
     console.log('🚀 Iniciando conexiones a bases de datos...');
     console.log('📍 Conectando a MongoDB Atlas...');
 
-    // ✅ Manejo específico de errores para MongoDB
+    // MongoDB (obligatorio)
     try {
       await connectMongoDB();
       results.mongodb = true;
@@ -30,8 +42,6 @@ export const connectDatabases = async () => {
     } catch (mongoError) {
       console.error('❌ MongoDB: Error de conexión');
       console.error('📋 Detalles:', mongoError?.message || mongoError);
-
-      // Diagnóstico rápido
       const msg = mongoError?.message || '';
       if (msg.includes('authentication failed')) {
         console.error('💡 Revisa username/password en MongoDB Atlas');
@@ -40,21 +50,20 @@ export const connectDatabases = async () => {
         console.error('💡 Agrega tu IP en Network Access (MongoDB Atlas)');
       }
       if (msg.includes('ENOTFOUND')) {
-        console.error('💡 Verifica conexión a internet y que el cluster esté activo');
+        console.error('💡 Verifica la red y que el cluster esté activo');
       }
-
       // MongoDB es obligatorio: re-lanzar
       throw mongoError;
     }
 
     // PostgreSQL (opcional)
-    if (process.env.POSTGRES_HOST && process.env.POSTGRES_DB) {
+    if (isPgConfigured) {
       try {
         await connectPostgreSQL();
         results.postgresql = true;
         console.log('✅ PostgreSQL: Conectado');
       } catch (pgErr) {
-        console.warn('⚠️ PostgreSQL: No se pudo conectar, continuando sin reportes avanzados');
+        console.warn('⚠️ PostgreSQL: No se pudo conectar, continuo sin reportes avanzados');
         console.warn('   Razón:', pgErr?.message || pgErr);
       }
     } else {
@@ -73,35 +82,31 @@ export const connectDatabases = async () => {
     return results;
   } catch (error) {
     console.error('❌ Error crítico conectando bases de datos:', error?.message || error);
-
     const msg = error?.message || '';
     if (msg.includes('authentication')) {
-      console.error('🔧 Ve a MongoDB Atlas → Database Access → Verifica credenciales');
+      console.error('🔧 Atlas → Database Access → Verifica credenciales');
     }
     if (msg.includes('IP') || msg.includes('not allowed')) {
-      console.error('🔧 Ve a MongoDB Atlas → Network Access → Agrega tu IP');
+      console.error('🔧 Atlas → Network Access → Agrega tu IP');
     }
-
     throw error;
   }
 };
 
 /**
  * Cierra todas las conexiones de base de datos de forma segura.
- * Incluye guards para evitar TypeError al cerrar conexiones inexistentes.
  */
 export const closeDatabases = async () => {
   const tasks = [];
 
-  // 🔒 Cerrar MongoDB (Mongoose) con import dinámico y guard
+  // Cerrar MongoDB (via mongoose)
   tasks.push(
     (async () => {
       try {
         const { default: mongoose } = await import('mongoose');
-        // readyState: 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
-        const state = mongoose?.connection?.readyState;
+        const state = mongoose?.connection?.readyState; // 0..3
         if (typeof state === 'number' && state !== 0) {
-          await mongoose.connection.close(false); // false = no force
+          await mongoose.connection.close(false);
           console.log('🛑 MongoDB cerrado');
         } else {
           console.log('ℹ️ MongoDB no estaba conectado; nada que cerrar.');
@@ -112,8 +117,8 @@ export const closeDatabases = async () => {
     })()
   );
 
-  // 🔒 Cerrar PostgreSQL si está configurado
-  if (process.env.POSTGRES_HOST) {
+  // Cerrar PostgreSQL si está configurado
+  if (isPgConfigured) {
     tasks.push(
       closePostgreSQL().catch((err) =>
         console.error('Error cerrando PostgreSQL:', err?.message || err)
@@ -121,14 +126,12 @@ export const closeDatabases = async () => {
     );
   }
 
-  // ✅ No revienta si uno de los cierres falla
   await Promise.allSettled(tasks);
   console.log('🔒 Todas las conexiones de base de datos cerradas');
 };
 
 /**
  * Verifica el estado de salud de las conexiones.
- * Devuelve flags por motor y un timestamp ISO.
  */
 export const checkDatabaseHealth = async () => {
   const health = {
@@ -138,14 +141,9 @@ export const checkDatabaseHealth = async () => {
   };
 
   try {
-    // Estado MongoDB (mongoose)
     const { default: mongoose } = await import('mongoose');
     health.mongodb = mongoose?.connection?.readyState === 1;
-
-    // Estado PostgreSQL
-    if (process.env.POSTGRES_HOST) {
-      health.postgresql = await testPostgreSQLConnection();
-    }
+    health.postgresql = await testPgConnection();
   } catch (error) {
     console.error('Error verificando salud de bases de datos:', error?.message || error);
   }
@@ -153,13 +151,8 @@ export const checkDatabaseHealth = async () => {
   return health;
 };
 
-// Re-exportaciones para uso directo en otras capas
-export {
-  connectMongoDB,
-  connectPostgreSQL,
-  testPostgreSQLConnection,
-  closePostgreSQL,
-  sequelize,
-};
+// Re-exportaciones útiles (sin forzar carga de símbolos inexistentes)
+export { connectMongoDB } from './mongodb.js';
+export { connectPostgreSQL, closePostgreSQL } from './postgresql.js';
 
 export default connectDatabases;

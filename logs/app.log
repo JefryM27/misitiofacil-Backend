@@ -7320,3 +7320,9 @@ SyntaxError: The requested module '../middleware/security.js' does not provide a
 [2025-09-03 04:00:24] [INFO] 🚀 Server listening on port 3001
 [2025-09-03 04:00:24] [INFO] 🔗 API base:   http://localhost:3001/api
 [2025-09-03 04:00:24] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":26928,"rssMB":114}
+[2025-09-03 04:23:36] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-03 04:23:36] [INFO] 🚀 Server listening on port 3001
+[2025-09-03 04:23:36] [INFO] 🌍 Env:        development
+[2025-09-03 04:23:36] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-03 04:23:36] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-03 04:23:36] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":22480,"rssMB":105}

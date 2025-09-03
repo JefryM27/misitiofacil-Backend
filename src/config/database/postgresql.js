@@ -1,98 +1,58 @@
-import { Sequelize } from 'sequelize';
+// src/config/database/postgresql.js
+// Carga perezosa y no-op cuando Postgres no está configurado.
+// Evita crasheos en serverless si no hay PG.
 
-// Configuración de PostgreSQL
-const sequelize = new Sequelize(
-  process.env.POSTGRES_DB,
-  process.env.POSTGRES_USER,
-  process.env.POSTGRES_PASSWORD,
-  {
-    host: process.env.POSTGRES_HOST,
-    port: process.env.POSTGRES_PORT || 5432,
-    dialect: 'postgres',
-    
-    // Pool de conexiones
-    pool: {
-      max: parseInt(process.env.POSTGRES_MAX_POOL_SIZE) || 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    },
-    
-    // Configuraciones adicionales
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    dialectOptions: {
-      // Para conexiones SSL (si usas servicios como AWS RDS, Heroku, etc.)
-      ssl: process.env.NODE_ENV === 'production' ? {
-        require: true,
-        rejectUnauthorized: false
-      } : false
-    },
-    
-    // Configuraciones de timezone
-    timezone: process.env.TIMEZONE || '-06:00', // Ajusta según tu zona horaria
-    
-    // Configuraciones de performance
-    define: {
-      timestamps: true,
-      underscored: true,
-      freezeTableName: true
-    }
-  }
+let sequelize = null;
+
+const isPgEnabled = Boolean(
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_HOST
 );
 
-export const connectPostgreSQL = async () => {
-  try {
-    console.log('🔗 Intentando conectar a PostgreSQL...');
-    
-    // Probar conexión
-    await sequelize.authenticate();
-    console.log(`✅ PostgreSQL conectado: ${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT || 5432}`);
-    
-    // Sincronizar modelos (solo en desarrollo)
-    if (process.env.NODE_ENV === 'development' && process.env.POSTGRES_SYNC === 'true') {
-      await sequelize.sync({ alter: true });
-      console.log('🔄 Modelos PostgreSQL sincronizados');
-    }
-    
-    return sequelize;
-    
-  } catch (err) {
-    console.error('❌ Error conectando a PostgreSQL:', err.message);
-    throw err;
-  }
-};
+export async function connectPostgreSQL() {
+  if (!isPgEnabled) return null; // no configurado → no-op
 
-// Función para cerrar conexión
-export const closePostgreSQL = async () => {
+  // Carga perezosa de deps
+  const { Sequelize } = await import('sequelize');
+  const pg = await import('pg');
+
+  if (sequelize) return sequelize;
+
+  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+  if (url) {
+    sequelize = new Sequelize(url, {
+      dialect: 'postgres',
+      dialectModule: pg,
+      logging: false,
+    });
+  } else {
+    sequelize = new Sequelize(
+      process.env.POSTGRES_DB,
+      process.env.POSTGRES_USER,
+      process.env.POSTGRES_PASSWORD,
+      {
+        host: process.env.POSTGRES_HOST,
+        port: Number(process.env.POSTGRES_PORT || 5432),
+        dialect: 'postgres',
+        dialectModule: pg,
+        logging: false,
+      }
+    );
+  }
+
+  return sequelize;
+}
+
+export async function closePostgreSQL() {
+  if (!sequelize) return;
   try {
     await sequelize.close();
-    console.log('🔒 Conexión PostgreSQL cerrada');
-  } catch (err) {
-    console.error('❌ Error cerrando conexión PostgreSQL:', err);
+  } finally {
+    sequelize = null;
   }
-};
+}
 
-// Función para probar la conexión
-export const testPostgreSQLConnection = async () => {
-  try {
-    await sequelize.authenticate();
-    console.log('✅ Test de conexión PostgreSQL exitoso');
-    return true;
-  } catch (error) {
-    console.error('❌ Test de conexión PostgreSQL falló:', error.message);
-    return false;
-  }
-};
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  await closePostgreSQL();
-});
-
-process.on('SIGTERM', async () => {
-  await closePostgreSQL();
-});
-
-// Exportar instancia de Sequelize para usar en modelos
-export { sequelize };
-export default sequelize;
+/* Aliases opcionales por si en algún lugar usaste los otros nombres */
+export { connectPostgreSQL as connectPostgres, closePostgreSQL as closePostgres };
