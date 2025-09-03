@@ -2,12 +2,14 @@
   "name": "misitiofacil-backend",
   "version": "1.0.0",
   "description": "Backend API para MiSitioFácil - Plataforma de creación de sitios web para pequeños negocios",
+  "private": true,
   "main": "src/server.js",
   "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "build": "echo 'No build step required for Node.js'",
+    "build": "node -e \"console.log('No build step required for Node.js')\"",
+    "vercel-build": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/",
@@ -34,14 +36,12 @@
     "cloudinary": "^1.41.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
-    "crypto": "^1.0.1",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.1.5",
     "express-slow-down": "^2.0.1",
     "express-validator": "^7.0.1",
-    "fs": "^0.0.1-security",
     "helmet": "^7.1.0",
     "hpp": "^0.2.3",
     "http-status-codes": "^2.3.0",
@@ -55,8 +55,6 @@
     "multer": "^1.4.5-lts.1",
     "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^6.9.7",
-    "os": "^0.1.2",
-    "path": "^0.12.7",
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.7",
@@ -80,7 +78,7 @@
     "supertest": "^6.3.3"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": "20.x",
     "npm": ">=9.0.0"
   },
   "repository": {

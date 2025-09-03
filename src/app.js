@@ -1,9 +1,8 @@
 // src/app.js — Clean, production-ready setup for MiSitioFácil API
 // ─────────────────────────────────────────────────────────────
-// Loads env, configures security (Helmet/CORS), rate limits,
-// parsers, logging, routes (/api), Swagger (/api-docs),
-// static files (/uploads in dev), health endpoints.
-// DB: lazy connect only for /api (serverless-friendly).
+// Loads env, security (Helmet/CORS), rate limits, parsers, logging,
+// routes (/api), Swagger (/api-docs), static (dev), health endpoints.
+// DB: lazy connect SOLO para /api (serverless-friendly).
 // Exports startServer(), closeDatabase() and the Express app.
 // ─────────────────────────────────────────────────────────────
 
@@ -24,7 +23,7 @@ import swaggerSpec from './config/docs/swagger.js';
 import { config, constants, logger, systemLogger } from './config/index.js';
 import { errorHandler, notFoundHandler } from './middleware/index.js';
 
-// ✅ usa el helper serverless-friendly
+// ✅ helper serverless-friendly para Mongo
 import { connectMongoDB, closeMongoDB } from './config/database/mongodb.js';
 
 // Pull environment constants (fallbacks included)
@@ -35,13 +34,13 @@ const isProd = NODE_ENV === 'production';
 // App
 // ─────────────────────────────────────────────────────────────
 const app = express();
-app.set('trust proxy', 1); // behind Vercel/Proxies, get real client IP
+app.set('trust proxy', 1);
 
-// Lightweight ping for LB diagnostics
+// Lightweight ping para balanceador/monitor
 app.get('/_ping', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
 // ─────────────────────────────────────────────────────────────
-// Security: Helmet (CSP strict in prod, disabled in dev)
+// Security
 // ─────────────────────────────────────────────────────────────
 app.use(
   helmet({
@@ -63,13 +62,13 @@ app.use(
 );
 
 // ─────────────────────────────────────────────────────────────
-// Compression & CORS (global, before routes)
+// Compression & CORS
 // ─────────────────────────────────────────────────────────────
 app.use(compression());
 applyCors(app);
 
 // ─────────────────────────────────────────────────────────────
-// Rate limiting (global + tighter for /api/auth) with real IP
+// Rate limiting
 // ─────────────────────────────────────────────────────────────
 const getRealIp = (req) =>
   req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
@@ -98,7 +97,7 @@ const authLimiter = rateLimit({
 app.use('/api/auth', authLimiter);
 
 // ─────────────────────────────────────────────────────────────
-// Parsers & Logging (must be before routes)
+// Parsers & logging
 // ─────────────────────────────────────────────────────────────
 app.use(
   express.json({
@@ -122,7 +121,7 @@ if (NODE_ENV === 'development') {
   app.use(morgan('combined', { skip: (_req, res) => res.statusCode < 400 }));
 }
 
-// Optional debug (dev only)
+// Debug opcional
 if (!isProd && process.env.DEBUG_ROUTES === 'true') {
   app.use((req, _res, next) => {
     console.log(`🔍 ${req.method} ${req.originalUrl}`);
@@ -133,7 +132,7 @@ if (!isProd && process.env.DEBUG_ROUTES === 'true') {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Basic info endpoints (no DB required)
+// Health & landing (NO requieren DB)
 // ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   const health = {
@@ -182,30 +181,47 @@ app.get('/', (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// API routes (lazy DB connect only for /api)
+// API routes (lazy DB connect SOLO aquí)
 // ─────────────────────────────────────────────────────────────
 import apiRoutes from './routes/index.js';
+
 let mongoReadyPromise;
-const ensureDb = async (_req, _res, next) => {
+
+// ⬇️ endurecido: responde 503 si falta MONGODB_URI o si la conexión falla
+const ensureDb = async (req, res, next) => {
+  const mongoUri = config?.database?.mongodb?.uri;
+  if (!mongoUri || mongoUri.includes('<db_password>')) {
+    return res.status(503).json({
+      success: false,
+      error: 'Database not configured',
+      code: 'DATABASE_CONFIG_ERROR'
+    });
+  }
   try {
-    mongoReadyPromise ??= connectMongoDB(); // cachea la promesa/conn
+    mongoReadyPromise ??= connectMongoDB();
     await mongoReadyPromise;
     next();
   } catch (e) {
-    next(e);
+    logger.error('❌ Mongo connection error', { message: e?.message });
+    return res.status(503).json({
+      success: false,
+      error: 'Database connection error',
+      code: 'DATABASE_CONNECTION_ERROR'
+    });
   }
 };
+
 app.use('/api', ensureDb, apiRoutes);
 
 // ─────────────────────────────────────────────────────────────
-// Static files (dev only; prod must use Cloudinary/S3)
+// Static (dev only)
 // ─────────────────────────────────────────────────────────────
 if (!isProd) {
   app.use('/uploads', express.static(config?.storage?.uploadPath || 'uploads'));
 }
 
 // ─────────────────────────────────────────────────────────────
-// Swagger (same origin as API) — before error handlers
+// Swagger
 // ─────────────────────────────────────────────────────────────
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   explorer: true,
@@ -215,13 +231,13 @@ app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
 app.get('/docs', (_req, res) => res.redirect(302, '/api-docs'));
 
 // ─────────────────────────────────────────────────────────────
-// Error handlers (keep LAST)
+// Errors (last)
 // ─────────────────────────────────────────────────────────────
 app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ─────────────────────────────────────────────────────────────
-// DB helpers (for local/testing)
+// DB helpers (local/testing)
 // ─────────────────────────────────────────────────────────────
 export const closeDatabase = async () => {
   try {
@@ -233,10 +249,9 @@ export const closeDatabase = async () => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Local bootstrap (Vercel does NOT use this)
+// Local bootstrap (Vercel NO usa esto)
 // ─────────────────────────────────────────────────────────────
 export const startServer = async () => {
-  // En local puedes conectar aquí o dejar que ensureDb lo haga bajo demanda.
   if (process.env.VERCEL !== '1') {
     try {
       mongoReadyPromise ??= connectMongoDB();
