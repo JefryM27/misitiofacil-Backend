@@ -1,12 +1,6 @@
 // /api/index.js
-// ─────────────────────────────────────────────────────────────
-// Serverless bridge for Express on Vercel
-// Imports your existing Express app and exposes it as a handler
-// ─────────────────────────────────────────────────────────────
-
 import app from '../src/app.js';
 
-export default function handler(req, res) {
-  // Express is compatible with (req, res)
-  return app(req, res);
-}
+// En Vercel el *default export* es el handler.
+// Express `app` ya es una función (req, res) compatible.
+export default app;
