@@ -17,17 +17,17 @@ const log = (...args) => {
 };
 
 /* ────────────────────────────────────────────────────────────
- * Build allowlists
- * - DEV: FRONTEND_URL, CORS_ORIGINS y defaults locales
- * - PROD: dominios oficiales + FRONTEND_URL/CORS_ORIGINS
- * - Opcional: previews de Vercel (ALLOW_VERCEL_PREVIEWS=true)
+ * Allow lists
  * ──────────────────────────────────────────────────────────── */
+
+// Dominio del front en Vercel (explícito)
+const FRONT_VERCEL = normalizeOrigin('https://front-end-mi-sitio-facil.vercel.app');
+
+// Dominios de producción (.org)
 const DEFAULT_PROD_ORIGINS = [
-  'https://misitiofacil.com',
-  'https://www.misitiofacil.com',
-  'https://app.misitiofacil.com',
-  'https://misitofacil.com',
-  'https://www.misitofacil.com'
+  'https://misitiofacil.org',
+  'https://www.misitiofacil.org',
+  'https://app.misitiofacil.org'
 ].map(normalizeOrigin);
 
 function buildDevOrigins() {
@@ -51,23 +51,33 @@ function buildProdOrigins() {
   const fromEnv = splitCsv(process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '');
   const frontend = normalizeOrigin(process.env.FRONTEND_URL || '');
   const admin = normalizeOrigin(process.env.ADMIN_FRONTEND_URL || process.env.ADMIN_CORS_ORIGIN || '');
-  // APP_URL es la URL de la API; no debería ser usada como origin del browser, pero no hace daño tenerla
-  const appUrl = normalizeOrigin(process.env.APP_URL || '');
+  const appUrl = normalizeOrigin(process.env.APP_URL || ''); // opcional
 
   return uniq([
     ...DEFAULT_PROD_ORIGINS,
-    frontend,
-    admin,
-    appUrl,
-    ...fromEnv
+    FRONT_VERCEL,     // explícito
+    frontend,         // ENV
+    admin,            // ENV
+    appUrl,           // ENV
+    ...fromEnv        // ENV (lista separada por comas)
   ]);
 }
 
-// Patrones (regex) opcionales — útiles para previews
+// Patrones (wildcards/previews)
 const PATTERNS = [];
+
+// *.misitiofacil.org (subdominios por slug)
+PATTERNS.push(/^https:\/\/(?:[^.]+\.)*misitiofacil\.org$/);
+
+// *.vercel.app (previews/producción en Vercel), activable por ENV o automático en previews
 if (process.env.ALLOW_VERCEL_PREVIEWS === 'true') {
   PATTERNS.push(/^https:\/\/[a-z0-9-]+\.vercel\.app$/);
 }
+if (process.env.VERCEL === '1' && process.env.VERCEL_ENV !== 'production') {
+  PATTERNS.push(/^https:\/\/[a-z0-9-]+\.vercel\.app$/);
+}
+
+// localhost (dev apuntando a backend en Vercel)
 if (process.env.ALLOW_ALL_HTTP_LOCALHOST === 'true') {
   PATTERNS.push(/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/);
 }
@@ -80,25 +90,18 @@ function matchesPatterns(origin) {
   return PATTERNS.some((re) => re.test(origin));
 }
 
-// Activa previews de Vercel automáticamente en deploys de preview
-if (process.env.VERCEL === '1' && process.env.VERCEL_ENV !== 'production') {
-  PATTERNS.push(/^https:\/\/[a-z0-9-]+\.vercel\.app$/);
-}
-
-
 function isAllowed(origin) {
-  if (!origin) return true; // same-origin, curl, Postman
+  if (!origin) return true; // same-origin / curl / Postman
   const o = normalizeOrigin(origin);
   if (isProd) {
-    return PROD_ORIGINS.includes(o) || matchesPatterns(o);
+    return PROD_ORIGINS.includes(o) || matchesPatterns(origin);
   }
-  // dev
   if (DEV_ORIGINS.includes(o)) return true;
-  return process.env.ALLOW_DEV_TOOLS === 'true' || matchesPatterns(o);
+  return process.env.ALLOW_DEV_TOOLS === 'true' || matchesPatterns(origin);
 }
 
 /* ────────────────────────────────────────────────────────────
- * CORS options (amigable con Swagger)
+ * CORS options
  * ──────────────────────────────────────────────────────────── */
 const DEFAULT_ALLOWED = [
   'authorization',
@@ -128,12 +131,7 @@ const corsOptions = {
 
   allowedHeaders: (req, cb) => {
     const raw = req.header('Access-Control-Request-Headers') || '';
-    const requested = uniq(
-      raw
-        .split(',')
-        .map((h) => h.trim().toLowerCase())
-        .filter(Boolean)
-    );
+    const requested = uniq(raw.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean));
     const headers = uniq([...requested, ...DEFAULT_ALLOWED]);
     log('🔎 CORS allowedHeaders →', headers.join(','));
     cb(null, headers);
@@ -147,18 +145,19 @@ const corsOptions = {
     'x-rate-limit-reset'
   ],
 
-  credentials: process.env.CORS_CREDENTIALS === 'true', // activa solo si usas cookies
+  // Activa sólo si usas cookies/sesiones cross-site
+  credentials: process.env.CORS_CREDENTIALS === 'true',
+
   maxAge: 86400,
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
 
 /* ────────────────────────────────────────────────────────────
- * Middlewares exportados (API estable)
+ * Middlewares exportados
  * ──────────────────────────────────────────────────────────── */
 export const corsMiddleware = cors(corsOptions);
 
-// Público (sin credenciales)
 export const publicCors = cors({
   origin: '*',
   methods: ['GET', 'OPTIONS'],
@@ -166,7 +165,6 @@ export const publicCors = cors({
   credentials: false
 });
 
-// Admin CORS — usa ADMIN_* y también respeta whitelists
 export const adminCors = cors({
   origin(origin, callback) {
     const adminOrigins = uniq([
@@ -177,7 +175,7 @@ export const adminCors = cors({
 
     if (!origin) return callback(null, true);
     const o = normalizeOrigin(origin);
-    if (adminOrigins.includes(o) || matchesPatterns(o)) return callback(null, true);
+    if (adminOrigins.includes(o) || matchesPatterns(origin)) return callback(null, true);
 
     console.warn(`🚫 Admin CORS blocked: ${origin}`);
     return callback(new Error('Admin access not allowed'));
@@ -200,15 +198,16 @@ export const corsWithLogging = (req, res, next) => {
   corsMiddleware(req, res, next);
 };
 
-// Check programático (útil en tests)
 export const isOriginAllowed = (origin) => {
   if (!origin) return true;
   const o = normalizeOrigin(origin);
-  return isProd ? PROD_ORIGINS.includes(o) || matchesPatterns(o) : DEV_ORIGINS.includes(o) || matchesPatterns(o);
+  return isProd
+    ? PROD_ORIGINS.includes(o) || matchesPatterns(origin)
+    : DEV_ORIGINS.includes(o) || matchesPatterns(origin);
 };
 
 /* ────────────────────────────────────────────────────────────
- * Aplicación global de CORS (incluye preflight amable)
+ * Aplicación global de CORS
  * ──────────────────────────────────────────────────────────── */
 export function applyCors(app) {
   console.log('🌐 Configurando CORS...');
@@ -220,7 +219,7 @@ export function applyCors(app) {
     if (PATTERNS.length) console.log('🧩 CORS patterns activos:', PATTERNS.map(String));
   }
 
-  // Preflight permisivo (útil para Swagger/SDKs)
+  // Preflight
   app.options('*', (req, res) => {
     corsMiddleware(req, res, (err) => {
       if (err) {
@@ -231,7 +230,7 @@ export function applyCors(app) {
     });
   });
 
-  // CORS para todas las rutas
+  // Global
   app.use((req, res, next) => {
     corsMiddleware(req, res, (err) => {
       if (err) {
@@ -242,20 +241,7 @@ export function applyCors(app) {
     });
   });
 
-  console.log('✅ CORS configurado (Swagger-friendly)');
+  console.log('✅ CORS configurado');
 }
-
-export const debugCors = (req, _res, next) => {
-  if (process.env.DEBUG_ROUTES === 'true') {
-    console.log('\n🔍 CORS Debug', {
-      method: req.method,
-      path: req.path,
-      origin: req.get('Origin') || 'same-origin',
-      referer: req.get('Referer') || 'no-referer',
-      headers: Object.keys(req.headers)
-    });
-  }
-  next();
-};
 
 export default corsMiddleware;
