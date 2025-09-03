@@ -1,61 +1,85 @@
+// src/config/env.js
 import dotenv from 'dotenv';
-
-// Cargar variables de entorno
 dotenv.config();
 
-// Definir variables requeridas y opcionales
+/* ─────────────────────────────────────────────────────────────
+   Flags de entorno
+───────────────────────────────────────────────────────────── */
+const IS_VERCEL = process.env.VERCEL === '1';
+const NODE_ENV = process.env.NODE_ENV || 'development';
+
+/* ─────────────────────────────────────────────────────────────
+   Requeridas / Opcionales
+   NOTA: No requerimos PORT (Vercel la gestiona). En local usamos 3001.
+───────────────────────────────────────────────────────────── */
 const REQUIRED_VARS = [
   'MONGODB_URI',
-  'JWT_SECRET',
-  'PORT'
+  'JWT_SECRET'
 ];
 
 const OPTIONAL_VARS = {
-  // Servidor
+  // App / Servidor
+  APP_NAME: 'MiSitioFácil',
+  APP_VERSION: '1.0.0',
   NODE_ENV: 'development',
-  PORT: '4000',
-  BASE_URL: 'http://localhost:4000',
-  TIMEZONE: '-06:00',
-  
+  PORT: '3001',
+  BASE_URL: 'http://localhost:3001',       // opcional; en Vercel preferir APP_URL
+  APP_URL: '',                              // p.ej. https://misitiofacil-api.vercel.app
+  FRONTEND_URL: 'http://localhost:3000',
+  API_PREFIX: '/api',
+  TIMEZONE: 'America/Costa_Rica',          // mejor zona IANA que offset
+
   // MongoDB
   MONGODB_MAX_POOL_SIZE: '10',
-  MONGODB_TIMEOUT_MS: '5000',
-  
+  MONGODB_TIMEOUT_MS: '15000',
+
   // JWT
   JWT_EXPIRES_IN: '7d',
   JWT_REFRESH_EXPIRES_IN: '30d',
-  
-  // Storage
-  STORAGE_TYPE: 'local',
+
+  // Storage / Uploads
+  STORAGE_TYPE: 'local', // en Vercel la FS es efímera: usar cloudinary en prod
   UPLOAD_PATH: 'uploads',
   UPLOAD_MAX_FILE_SIZE: '2097152', // 2MB
   UPLOAD_MAX_FILES: '5',
   UPLOAD_ALLOWED_TYPES: 'image/jpeg,image/png,image/webp,image/jpg',
-  
+
   // Seguridad
   CORS_ORIGIN: 'http://localhost:3000',
-  RATE_LIMIT_WINDOW_MS: '900000', // 15 minutos
+  ADMIN_CORS_ORIGIN: '',
+  RATE_LIMIT_WINDOW_MS: '900000', // 15 min
   RATE_LIMIT_MAX_REQUESTS: '100',
   BCRYPT_ROUNDS: '12',
-  
+
   // Logging
   LOG_LEVEL: 'info',
   LOG_FILE: 'logs/app.log',
-  
+
   // Desarrollo
   DEBUG_DB: 'false',
   DEBUG_ROUTES: 'false',
   SKIP_RATE_LIMIT: 'false'
 };
 
-// Función para validar variables de entorno
+/* ─────────────────────────────────────────────────────────────
+   Utils
+───────────────────────────────────────────────────────────── */
+const toInt = (v, def) => {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? n : def;
+};
+const toBool = (v) => v === 'true' || v === '1';
+
+/* ─────────────────────────────────────────────────────────────
+   Validación de variables
+───────────────────────────────────────────────────────────── */
 export const validateEnv = () => {
   const errors = [];
   const warnings = [];
-  
+
   console.log('🔍 Validando variables de entorno...');
-  
-  // Verificar variables requeridas
+
+  // Requeridas
   for (const varName of REQUIRED_VARS) {
     if (!process.env[varName]) {
       errors.push(`❌ Variable requerida faltante: ${varName}`);
@@ -63,292 +87,290 @@ export const validateEnv = () => {
       console.log(`✅ ${varName}: configurado`);
     }
   }
-  
-  // Establecer valores por defecto para variables opcionales
-  for (const [varName, defaultValue] of Object.entries(OPTIONAL_VARS)) {
+
+  // Defaults para opcionales
+  for (const [varName, defVal] of Object.entries(OPTIONAL_VARS)) {
     if (!process.env[varName]) {
-      process.env[varName] = defaultValue;
-      warnings.push(`⚠️  ${varName}: usando valor por defecto (${defaultValue})`);
+      process.env[varName] = defVal;
+      warnings.push(`⚠️  ${varName}: usando valor por defecto (${defVal})`);
     } else {
       console.log(`✅ ${varName}: ${process.env[varName]}`);
     }
   }
-  
+
   // Validaciones específicas
   validateSpecificVars(errors, warnings);
-  
-  // Mostrar warnings
-  if (warnings.length > 0) {
-    console.log('\n📋 Variables con valores por defecto:');
-    warnings.forEach(warning => console.log(warning));
+
+  if (warnings.length) {
+    console.log('\n📋 Variables con valores por defecto o potencialmente mejorables:');
+    warnings.forEach((w) => console.log(w));
   }
-  
-  // Si hay errores, terminar la aplicación
-  if (errors.length > 0) {
+
+  if (errors.length) {
     console.error('\n💥 Errores en configuración:');
-    errors.forEach(error => console.error(error));
-    console.error('\n📝 Revisa tu archivo .env y corrige los errores antes de continuar.');
-    process.exit(1);
+    errors.forEach((e) => console.error(e));
+    console.error('\n📝 Revisa tu archivo .env y corrige los errores.');
+
+    // En Vercel no matamos el build; en local sí fallamos temprano.
+    if (!IS_VERCEL) process.exit(1);
+  } else {
+    console.log('\n✅ Variables de entorno validadas');
   }
-  
-  console.log('\n✅ Todas las variables de entorno están configuradas correctamente');
-  return true;
+
+  return { ok: errors.length === 0, errors, warnings };
 };
 
-// Validaciones específicas para ciertas variables
 const validateSpecificVars = (errors, warnings) => {
-  // Validar JWT_SECRET
+  // JWT_SECRET
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-    warnings.push('⚠️  JWT_SECRET es muy corto. Recomendado: mínimo 32 caracteres');
+    warnings.push('⚠️  JWT_SECRET es muy corto. Recomendado: mínimo 32 caracteres.');
   }
-  
-  // Validar PORT
-  const port = parseInt(process.env.PORT);
-  if (isNaN(port) || port < 1 || port > 65535) {
-    errors.push('❌ PORT debe ser un número entre 1 y 65535');
+
+  // PORT (opcional)
+  const port = toInt(process.env.PORT, 3001);
+  if (port < 1 || port > 65535) {
+    warnings.push('⚠️  PORT fuera de rango (1-65535). Usando 3001 en local.');
+    process.env.PORT = '3001';
   }
-  
-  // Validar MONGODB_URI
-  if (process.env.MONGODB_URI && !process.env.MONGODB_URI.startsWith('mongodb')) {
-    errors.push('❌ MONGODB_URI debe empezar con "mongodb://" o "mongodb+srv://"');
+
+  // MONGODB_URI
+  if (process.env.MONGODB_URI && !/^mongodb(\+srv)?:\/\//.test(process.env.MONGODB_URI)) {
+    errors.push('❌ MONGODB_URI debe empezar con "mongodb://" o "mongodb+srv://".');
   }
-  
-  // Validar UPLOAD_MAX_FILE_SIZE
-  const maxFileSize = parseInt(process.env.UPLOAD_MAX_FILE_SIZE);
-  if (isNaN(maxFileSize) || maxFileSize <= 0) {
-    errors.push('❌ UPLOAD_MAX_FILE_SIZE debe ser un número positivo');
+  if (process.env.MONGODB_URI?.includes('<PASSWORD>') || process.env.MONGODB_URI?.includes('<db_password>')) {
+    errors.push('❌ MONGODB_URI contiene placeholders. Reemplázalos por credenciales reales.');
   }
-  
-  // Validar BCRYPT_ROUNDS
-  const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS);
-  if (isNaN(bcryptRounds) || bcryptRounds < 10 || bcryptRounds > 15) {
-    warnings.push('⚠️  BCRYPT_ROUNDS recomendado entre 10 y 15');
+
+  // UPLOAD_MAX_FILE_SIZE
+  const maxFileSize = toInt(process.env.UPLOAD_MAX_FILE_SIZE, 0);
+  if (maxFileSize <= 0) {
+    errors.push('❌ UPLOAD_MAX_FILE_SIZE debe ser un número positivo.');
   }
-  
-  // Validar NODE_ENV
-  const validEnvironments = ['development', 'production', 'test'];
-  if (!validEnvironments.includes(process.env.NODE_ENV)) {
-    warnings.push('⚠️  NODE_ENV debe ser: development, production o test');
+
+  // BCRYPT_ROUNDS
+  const rounds = toInt(process.env.BCRYPT_ROUNDS, 12);
+  if (rounds < 10 || rounds > 15) {
+    warnings.push('⚠️  BCRYPT_ROUNDS recomendado entre 10 y 15.');
   }
-  
-  // Validar CORS_ORIGIN en producción
-  if (process.env.NODE_ENV === 'production' && 
-      process.env.CORS_ORIGIN === 'http://localhost:3000') {
-    warnings.push('⚠️  CORS_ORIGIN debería ser tu dominio real en producción');
+
+  // NODE_ENV
+  const validEnvs = ['development', 'production', 'test'];
+  if (!validEnvs.includes(process.env.NODE_ENV)) {
+    warnings.push('⚠️  NODE_ENV debe ser: development, production o test.');
   }
-  
-  // Validar BASE_URL
-  if (process.env.BASE_URL && !process.env.BASE_URL.startsWith('http')) {
-    errors.push('❌ BASE_URL debe empezar con "http://" o "https://"');
+
+  // CORS en prod
+  if (NODE_ENV === 'production' && process.env.CORS_ORIGIN?.includes('localhost')) {
+    warnings.push('⚠️  CORS_ORIGIN debería ser tu dominio real en producción.');
   }
-  
-  // Validar LOG_LEVEL
-  const validLogLevels = ['error', 'warn', 'info', 'debug'];
-  if (!validLogLevels.includes(process.env.LOG_LEVEL)) {
-    warnings.push('⚠️  LOG_LEVEL debe ser: error, warn, info o debug');
+
+  // BASE_URL / APP_URL
+  const urlLike = (s) => !!s && /^https?:\/\//.test(s);
+  if (process.env.BASE_URL && !urlLike(process.env.BASE_URL)) {
+    warnings.push('⚠️  BASE_URL debería empezar con "http://" o "https://".');
   }
-  
-  // Validar STORAGE_TYPE
-  const validStorageTypes = ['local', 'cloudinary'];
-  if (!validStorageTypes.includes(process.env.STORAGE_TYPE)) {
-    warnings.push('⚠️  STORAGE_TYPE debe ser: local o cloudinary');
+  if (process.env.APP_URL && !urlLike(process.env.APP_URL)) {
+    warnings.push('⚠️  APP_URL debería empezar con "http://" o "https://".');
   }
-  
-  // Validar tipos de archivos permitidos
+
+  // STORAGE_TYPE en Vercel
+  if (IS_VERCEL && process.env.STORAGE_TYPE === 'local') {
+    warnings.push('⚠️  STORAGE_TYPE=local en Vercel usa FS efímero. Considera Cloudinary en producción.');
+  }
+
+  // LOG_LEVEL
+  const validLevels = ['error', 'warn', 'info', 'debug'];
+  if (!validLevels.includes(process.env.LOG_LEVEL)) {
+    warnings.push('⚠️  LOG_LEVEL debe ser: error, warn, info o debug.');
+  }
+
+  // UPLOAD_ALLOWED_TYPES
   if (process.env.UPLOAD_ALLOWED_TYPES) {
-    const allowedTypes = process.env.UPLOAD_ALLOWED_TYPES.split(',');
-    const validMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    const invalidTypes = allowedTypes.filter(type => !validMimeTypes.includes(type.trim()));
-    
-    if (invalidTypes.length > 0) {
-      warnings.push(`⚠️  Tipos de archivo no recomendados: ${invalidTypes.join(', ')}`);
+    const allowed = process.env.UPLOAD_ALLOWED_TYPES.split(',').map((s) => s.trim());
+    const valid = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const invalid = allowed.filter((t) => !valid.includes(t));
+    if (invalid.length) {
+      warnings.push(`⚠️  Tipos de archivo no recomendados: ${invalid.join(', ')}`);
     }
   }
 };
 
-// Función para obtener configuración procesada
+/* ─────────────────────────────────────────────────────────────
+   Config processada
+───────────────────────────────────────────────────────────── */
 export const getConfig = () => {
+  const allowedTypes = (process.env.UPLOAD_ALLOWED_TYPES || '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+
   return {
-    // Servidor
     app: {
       name: process.env.APP_NAME || 'MiSitioFácil',
       version: process.env.APP_VERSION || '1.0.0',
-      env: process.env.NODE_ENV,
-      port: parseInt(process.env.PORT),
+      env: NODE_ENV,
+      port: toInt(process.env.PORT, 3001),
       baseUrl: process.env.BASE_URL,
+      appUrl: process.env.APP_URL,
+      apiPrefix: (process.env.API_PREFIX || '/api').replace(/\/?$/, ''), // '/api'
       timezone: process.env.TIMEZONE
     },
-    
-    // Base de datos
+
+    // DB
     database: {
       mongodb: {
         uri: process.env.MONGODB_URI,
-        maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE),
-        timeoutMs: parseInt(process.env.MONGODB_TIMEOUT_MS)
+        maxPoolSize: toInt(process.env.MONGODB_MAX_POOL_SIZE, 10),
+        timeoutMs: toInt(process.env.MONGODB_TIMEOUT_MS, 15000)
       },
+      // PostgreSQL opcional (si usas reportes u otra cosa)
       postgresql: {
         host: process.env.POSTGRES_HOST,
-        port: parseInt(process.env.POSTGRES_PORT || '5432'),
+        port: toInt(process.env.POSTGRES_PORT || '5432', 5432),
         database: process.env.POSTGRES_DB,
         user: process.env.POSTGRES_USER,
         password: process.env.POSTGRES_PASSWORD,
-        maxPoolSize: parseInt(process.env.POSTGRES_MAX_POOL_SIZE || '5'),
-        sync: process.env.POSTGRES_SYNC === 'true'
+        maxPoolSize: toInt(process.env.POSTGRES_MAX_POOL_SIZE || '5', 5),
+        sync: toBool(process.env.POSTGRES_SYNC || 'false')
       }
     },
-    
-    // Autenticación
+
     auth: {
       jwtSecret: process.env.JWT_SECRET,
       jwtExpiresIn: process.env.JWT_EXPIRES_IN,
       jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
-      bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS)
+      bcryptRounds: toInt(process.env.BCRYPT_ROUNDS, 12)
     },
-    
-    // Storage
+
     storage: {
       type: process.env.STORAGE_TYPE,
       uploadPath: process.env.UPLOAD_PATH,
-      maxFileSize: parseInt(process.env.UPLOAD_MAX_FILE_SIZE),
-      maxFiles: parseInt(process.env.UPLOAD_MAX_FILES),
-      allowedTypes: process.env.UPLOAD_ALLOWED_TYPES.split(',').map(type => type.trim()),
+      maxFileSize: toInt(process.env.UPLOAD_MAX_FILE_SIZE, 2 * 1024 * 1024),
+      maxFiles: toInt(process.env.UPLOAD_MAX_FILES, 5),
+      allowedTypes,
       cloudinary: {
         cloudName: process.env.CLOUDINARY_CLOUD_NAME,
         apiKey: process.env.CLOUDINARY_API_KEY,
         apiSecret: process.env.CLOUDINARY_API_SECRET
       }
     },
-    
-    // Seguridad
+
     security: {
       corsOrigin: process.env.CORS_ORIGIN,
       adminCorsOrigin: process.env.ADMIN_CORS_ORIGIN,
-      rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS),
-      rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS),
-      skipRateLimit: process.env.SKIP_RATE_LIMIT === 'true'
+      rateLimitWindowMs: toInt(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
+      rateLimitMaxRequests: toInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100),
+      skipRateLimit: toBool(process.env.SKIP_RATE_LIMIT || 'false')
     },
-    
-    // Email (futuro)
+
     email: {
       host: process.env.EMAIL_HOST,
-      port: parseInt(process.env.EMAIL_PORT || '587'),
+      port: toInt(process.env.EMAIL_PORT || '587', 587),
       user: process.env.EMAIL_USER,
       password: process.env.EMAIL_PASSWORD,
       from: process.env.EMAIL_FROM
     },
-    
-    // SMS/WhatsApp (futuro)
+
     notifications: {
       twilioAccountSid: process.env.TWILIO_ACCOUNT_SID,
       twilioAuthToken: process.env.TWILIO_AUTH_TOKEN,
       twilioPhoneNumber: process.env.TWILIO_PHONE_NUMBER
     },
-    
-    // Logging
+
     logging: {
       level: process.env.LOG_LEVEL,
       file: process.env.LOG_FILE,
-      enableConsole: process.env.NODE_ENV !== 'production',
-      enableFile: true
+      enableConsole: NODE_ENV !== 'production' || IS_VERCEL, // en Vercel: consola
+      enableFile: NODE_ENV !== 'production' && !IS_VERCEL   // nunca escribir archivo en Vercel
     },
-    
-    // Desarrollo
+
     development: {
-      debugDb: process.env.DEBUG_DB === 'true',
-      debugRoutes: process.env.DEBUG_ROUTES === 'true'
+      debugDb: toBool(process.env.DEBUG_DB || 'false'),
+      debugRoutes: toBool(process.env.DEBUG_ROUTES || 'false')
     }
   };
 };
 
-// Función para verificar si la aplicación está lista para producción
+/* ─────────────────────────────────────────────────────────────
+   Chequeos de producción
+───────────────────────────────────────────────────────────── */
 export const checkProductionReadiness = () => {
-  if (process.env.NODE_ENV !== 'production') {
+  if (NODE_ENV !== 'production') {
     return { ready: true, message: 'Not in production mode' };
   }
-  
+
   const issues = [];
-  
-  // Verificar JWT_SECRET seguro
-  if (process.env.JWT_SECRET.length < 32) {
+
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
     issues.push('JWT_SECRET es muy corto para producción');
   }
-  
-  // Verificar CORS configurado correctamente
-  if (process.env.CORS_ORIGIN.includes('localhost')) {
+  if (process.env.CORS_ORIGIN?.includes('localhost')) {
     issues.push('CORS_ORIGIN no debería usar localhost en producción');
   }
-  
-  // Verificar BASE_URL
-  if (!process.env.BASE_URL.startsWith('https://')) {
+  if (process.env.BASE_URL && !/^https:\/\//.test(process.env.BASE_URL)) {
     issues.push('BASE_URL debería usar HTTPS en producción');
   }
-  
-  // Verificar variables de producción específicas
-  const productionVars = [
-    'POSTGRES_HOST',
-    'EMAIL_HOST',
-    'CLOUDINARY_CLOUD_NAME'
-  ];
-  
-  const missingOptional = productionVars.filter(varName => !process.env[varName]);
-  if (missingOptional.length > 0) {
-    issues.push(`Variables opcionales faltantes: ${missingOptional.join(', ')}`);
+  if (!process.env.APP_URL) {
+    issues.push('APP_URL no configurado (útil para construir URLs públicas correctamente)');
   }
-  
+
   return {
     ready: issues.length === 0,
-    issues: issues,
+    issues,
     message: issues.length === 0 ? 'Listo para producción' : 'Requiere configuración adicional'
   };
 };
 
-// Función para mostrar resumen de configuración
+/* ─────────────────────────────────────────────────────────────
+   Resumen
+───────────────────────────────────────────────────────────── */
+const mask = (s) => (s ? s.replace(/\/\/.*@/, '//***:***@') : '');
 export const showConfigSummary = () => {
   const config = getConfig();
-  
+
   console.log('\n📊 Resumen de configuración:');
-  console.log(`   🏷️  Aplicación: ${config.app.name} v${config.app.version}`);
-  console.log(`   🌍 Entorno: ${config.app.env}`);
-  console.log(`   🚀 Puerto: ${config.app.port}`);
+  console.log(`   🏷️  App: ${config.app.name} v${config.app.version}`);
+  console.log(`   🌍 Entorno: ${config.app.env} ${IS_VERCEL ? '(Vercel)' : ''}`);
+  console.log(`   🚀 Puerto (local): ${config.app.port}`);
+  console.log(`   🔗 APP_URL: ${config.app.appUrl || '(no definido)'}`);
+  console.log(`   🔗 BASE_URL: ${config.app.baseUrl || '(no definido)'}`);
   console.log(`   🗄️  MongoDB: ${config.database.mongodb.uri ? '✅ Configurado' : '❌ No configurado'}`);
-  console.log(`   🐘 PostgreSQL: ${config.database.postgresql.host ? '✅ Configurado' : '⚠️  No configurado'}`);
   console.log(`   🔐 JWT: ${config.auth.jwtSecret ? '✅ Configurado' : '❌ No configurado'}`);
-  console.log(`   📁 Storage: ${config.storage.type}`);
+  console.log(`   📁 Storage: ${config.storage.type}${IS_VERCEL && config.storage.type === 'local' ? ' (⚠️ efímero en Vercel)' : ''}`);
   console.log(`   📧 Email: ${config.email.host ? '✅ Configurado' : '⚠️  No configurado'}`);
-  console.log(`   📱 SMS: ${config.notifications.twilioAccountSid ? '✅ Configurado' : '⚠️  No configurado'}`);
-  
+
+  if (config.database.mongodb.uri) {
+    console.log(`   🔒 Mongo URI: ${mask(config.database.mongodb.uri)}`);
+  }
+
   if (config.app.env === 'production') {
-    const prodCheck = checkProductionReadiness();
-    console.log(`   🎯 Listo para producción: ${prodCheck.ready ? '✅' : '❌'}`);
-    if (!prodCheck.ready) {
-      console.log(`      Problemas: ${prodCheck.issues.join(', ')}`);
-    }
+    const prod = checkProductionReadiness();
+    console.log(`   🎯 Listo para producción: ${prod.ready ? '✅' : '❌'}`);
+    if (!prod.ready) console.log(`      Problemas: ${prod.issues.join(', ')}`);
   }
 };
 
-// Función para generar .env.example basado en la configuración actual
+/* ─────────────────────────────────────────────────────────────
+   Generador .env.example (sin comillas)
+───────────────────────────────────────────────────────────── */
 export const generateEnvExample = () => {
   const example = `# ==============================================
-# MISITOFÁCIL - TEMPLATE DE CONFIGURACIÓN
+# MiSitioFácil - .env.example
 # ==============================================
 
 # ============== SERVIDOR ==================
-PORT=4000
+PORT=3001
 NODE_ENV=development
-BASE_URL=http://localhost:4000
-TIMEZONE=-06:00
+APP_URL=
+FRONTEND_URL=http://localhost:3000
+BASE_URL=http://localhost:3001
+API_PREFIX=/api
+TIMEZONE=America/Costa_Rica
 
 # ============== MONGODB ===================
-MONGODB_URI="mongodb+srv://USERNAME:PASSWORD@cluster.mongodb.net/DATABASE_NAME?retryWrites=true&w=majority"
+MONGODB_URI=mongodb+srv://USERNAME:PASSWORD@cluster.mongodb.net/DATABASE_NAME?retryWrites=true&w=majority
 MONGODB_MAX_POOL_SIZE=10
-MONGODB_TIMEOUT_MS=5000
-
-# ============== POSTGRESQL (REPORTES) =====
-# POSTGRES_HOST=localhost
-# POSTGRES_PORT=5432
-# POSTGRES_DB=misitiofacil_reports
-# POSTGRES_USER=tu_usuario
-# POSTGRES_PASSWORD=tu_password
+MONGODB_TIMEOUT_MS=15000
 
 # ============== AUTENTICACIÓN =============
 JWT_SECRET=tu_jwt_secret_super_seguro_aqui_minimo_32_caracteres
@@ -361,20 +383,22 @@ UPLOAD_PATH=uploads
 UPLOAD_MAX_FILE_SIZE=2097152
 UPLOAD_MAX_FILES=5
 UPLOAD_ALLOWED_TYPES=image/jpeg,image/png,image/webp,image/jpg
+# CLOUDINARY_CLOUD_NAME=
+# CLOUDINARY_API_KEY=
+# CLOUDINARY_API_SECRET=
 
-# ============== SEGURIDAD ==================
+# ============== SEGURIDAD =================
 CORS_ORIGIN=http://localhost:3000
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 BCRYPT_ROUNDS=12
 
-# ============== LOGGING ====================
+# ============== LOGGING ===================
 LOG_LEVEL=info
 LOG_FILE=logs/app.log
 `;
-  
   return example;
 };
 
-// Exportar configuración procesada como default
+// Export por defecto: config procesada
 export default getConfig();

@@ -7211,3 +7211,70 @@ SyntaxError: The requested module '../middleware/security.js' does not provide a
 [2025-09-02 17:22:26] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":31852,"memory":{"rss":115965952,"heapTotal":76042240,"heapUsed":41754800,"external":22212675,"arrayBuffers":18301516}}
 [2025-09-02 17:22:26] [INFO] 🔗 API base:   http://localhost:3001/api
 [2025-09-02 17:22:26] [INFO] 🌍 Env:        development
+[2025-09-02 18:05:58] [WARN] ⚠️ MongoDB disconnected
+[2025-09-02 18:06:09] [INFO] 🔄 MongoDB reconnected
+[2025-09-02 22:03:00] [INFO] ✅ MongoDB connected | {"host":"ac-0rjkpo5-shard-00-01.96dvgx4.mongodb.net","db":"misitiofacil","tookMs":1021}
+[2025-09-02 22:03:00] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:03:00] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:03:00] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:03:00] [INFO] 🌍 Env:        development
+[2025-09-02 22:03:00] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:03:00] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":29376,"memory":{"rss":116543488,"heapTotal":75780096,"heapUsed":41784544,"external":22212675,"arrayBuffers":18301516}}
+[2025-09-02 22:18:17] [INFO] ✅ MongoDB connected | {"host":"ac-0rjkpo5-shard-00-02.96dvgx4.mongodb.net","db":"misitiofacil","tookMs":1091}
+[2025-09-02 22:18:17] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:18:17] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:18:17] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:18:17] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:18:17] [INFO] 🌍 Env:        development
+[2025-09-02 22:18:17] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":17484,"memory":{"rss":116117504,"heapTotal":76304384,"heapUsed":41800048,"external":22212675,"arrayBuffers":18301516}}
+[2025-09-02 22:18:25] [INFO] ✅ MongoDB connected | {"host":"ac-0rjkpo5-shard-00-01.96dvgx4.mongodb.net","db":"misitiofacil","tookMs":839}
+[2025-09-02 22:18:25] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:18:25] [INFO] 🌍 Env:        development
+[2025-09-02 22:18:25] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:18:25] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":2452,"memory":{"rss":116318208,"heapTotal":76042240,"heapUsed":41834568,"external":22212675,"arrayBuffers":18301516}}
+[2025-09-02 22:18:25] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:18:25] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:27:51] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:27:51] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:27:51] [INFO] ✅ MongoDB connected | {"host":"ac-0rjkpo5-shard-00-01.96dvgx4.mongodb.net","db":"misitiofacil","tookMs":953}
+[2025-09-02 22:27:51] [INFO] 🌍 Env:        development
+[2025-09-02 22:27:51] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:27:51] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":26236,"memory":{"rss":116002816,"heapTotal":76042240,"heapUsed":41761032,"external":22212675,"arrayBuffers":18301516}}
+[2025-09-02 22:27:51] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:38:25] [INFO] ✅ MongoDB connected | {"host":"ac-0rjkpo5-shard-00-00.96dvgx4.mongodb.net","db":"misitiofacil","tookMs":1170}
+[2025-09-02 22:38:25] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:38:25] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:38:25] [INFO] 🌍 Env:        development
+[2025-09-02 22:38:25] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:38:25] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:38:25] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":27420,"memory":{"rss":116166656,"heapTotal":76042240,"heapUsed":41835280,"external":22212675,"arrayBuffers":18301516}}
+[2025-09-02 22:40:38] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:40:38] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:40:38] [INFO] 🌍 Env:        development
+[2025-09-02 22:40:38] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:40:38] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:40:38] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":31784,"memory":{"rss":116224000,"heapTotal":75780096,"heapUsed":41753112,"external":22212475,"arrayBuffers":18301316}}
+[2025-09-02 22:49:25] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:49:25] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:49:25] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:49:25] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:49:25] [INFO] 🌍 Env:        development
+[2025-09-02 22:49:25] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":33048,"memory":{"rss":116109312,"heapTotal":76042240,"heapUsed":41803112,"external":22212475,"arrayBuffers":18301316}}
+[2025-09-02 22:53:06] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:53:06] [INFO] 🌍 Env:        development
+[2025-09-02 22:53:06] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:53:06] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:53:06] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:53:06] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":8296,"rssMB":112}
+[2025-09-02 22:55:31] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:55:31] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:55:31] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:55:31] [INFO] 🌍 Env:        development
+[2025-09-02 22:55:31] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:55:31] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":4872,"rssMB":112}
+[2025-09-02 22:57:24] [INFO] 🚀 Server listening on port 3001
+[2025-09-02 22:57:24] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-02 22:57:24] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-02 22:57:24] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-02 22:57:24] [INFO] 🌍 Env:        development
+[2025-09-02 22:57:24] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":12236,"rssMB":112}

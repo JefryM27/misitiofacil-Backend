@@ -22,8 +22,8 @@ function getServerUrl() {
 const version = process.env.APP_VERSION || '1.0.0';
 const SERVER_BASE = getServerUrl();
 
-// ✅ Define el prefijo para los paths (siempre con slash inicial)
-const API_PREFIX = (process.env.API_PREFIX || '/api').replace(/\/?$/, ''); // asegura formato '/api'
+// ✅ Prefijo para paths: garantiza exactamente "/api"
+const API_PREFIX = `/${(process.env.API_PREFIX || 'api').replace(/^\/+|\/+$/g, '')}`;
 
 const swaggerDefinition = {
   openapi: '3.0.3',
@@ -181,7 +181,7 @@ const swaggerDefinition = {
         properties: {
           success: { type: 'boolean', example: true },
           message: { type: 'string', example: 'Login exitoso' },
-          data: {
+        data: {
             type: 'object',
             properties: {
               user: { $ref: '#/components/schemas/User' },
@@ -846,6 +846,7 @@ const swaggerDefinition = {
       }
     },
 
+    // ♻️ Reusables (DEBEN estar dentro de components)
     responses: {
       UnauthorizedError: {
         description: 'Unauthorized (missing/invalid token)',
@@ -1327,8 +1328,8 @@ const swaggerDefinition = {
 const swaggerSpec = swaggerJSDoc({
   failOnErrors: false,
   definition: swaggerDefinition,
-  // Si también usas anotaciones JSDoc en rutas/controladores, puedes mantener estos globs:
-  apis: ['./src/routes/**/*.js', './src/controllers/**/*.js']
+  // Opcional: como ya defines "paths" arriba, no necesitas escanear todo el repo.
+  apis: ['./src/routes/*.js', './src/controllers/*.js'],
 });
 
 export default swaggerSpec;

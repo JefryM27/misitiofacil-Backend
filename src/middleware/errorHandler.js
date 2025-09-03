@@ -1,8 +1,25 @@
+// src/middleware/errorHandler.js
 import { constants, logger } from '../config/index.js';
 
-const { ERROR_MESSAGES } = constants;
+/* ────────────────────────────────────────────────────────────
+   Mensajes por defecto (por si constants no está)
+──────────────────────────────────────────────────────────── */
+const DEFAULT_ERROR_MESSAGES = {
+  INTERNAL_ERROR: 'Error interno del servidor',
+  NOT_FOUND: 'Recurso no encontrado',
+  ACCESS_DENIED: 'Acceso denegado',
+  BAD_REQUEST: 'Solicitud inválida',
+  RATE_LIMIT_EXCEEDED: 'Demasiadas solicitudes'
+};
 
-// Clase personalizada para errores de la aplicación
+const ERROR_MESSAGES = {
+  ...DEFAULT_ERROR_MESSAGES,
+  ...(constants?.ERROR_MESSAGES || {})
+};
+
+/* ────────────────────────────────────────────────────────────
+   Clases de error de dominio
+──────────────────────────────────────────────────────────── */
 export class AppError extends Error {
   constructor(message, statusCode = 500, code = null, details = null) {
     super(message);
@@ -11,151 +28,139 @@ export class AppError extends Error {
     this.code = code;
     this.details = details;
     this.isOperational = true;
-
-    Error.captureStackTrace(this, this.constructor);
+    Error.captureStackTrace?.(this, this.constructor);
   }
 }
 
-// Errores específicos para diferentes situaciones
 export class ValidationError extends AppError {
   constructor(message = ERROR_MESSAGES.BAD_REQUEST, details = null) {
     super(message, 400, 'VALIDATION_ERROR', details);
   }
 }
-
 export class AuthenticationError extends AppError {
   constructor(message = ERROR_MESSAGES.ACCESS_DENIED) {
     super(message, 401, 'AUTHENTICATION_ERROR');
   }
 }
-
 export class AuthorizationError extends AppError {
   constructor(message = ERROR_MESSAGES.ACCESS_DENIED) {
     super(message, 403, 'AUTHORIZATION_ERROR');
   }
 }
-
 export class NotFoundError extends AppError {
   constructor(message = ERROR_MESSAGES.NOT_FOUND) {
     super(message, 404, 'NOT_FOUND_ERROR');
   }
 }
-
 export class ConflictError extends AppError {
   constructor(message = 'Conflicto con el estado actual del recurso') {
     super(message, 409, 'CONFLICT_ERROR');
   }
 }
-
 export class RateLimitError extends AppError {
   constructor(message = ERROR_MESSAGES.RATE_LIMIT_EXCEEDED) {
     super(message, 429, 'RATE_LIMIT_ERROR');
   }
 }
 
-// Función para manejar errores de MongoDB
+/* ────────────────────────────────────────────────────────────
+   Normalizadores de errores de librerías
+──────────────────────────────────────────────────────────── */
+// Mongoose / MongoDB
 const handleMongoError = (error) => {
-  // Error de validación de Mongoose
-  if (error.name === 'ValidationError') {
-    const errors = Object.values(error.errors).map(err => ({
-      field: err.path,
-      message: err.message,
-      value: err.value
+  // Validaciones de Mongoose
+  if (error?.name === 'ValidationError') {
+    const details = Object.values(error.errors || {}).map((err) => ({
+      field: err?.path,
+      message: err?.message,
+      value: err?.value
     }));
-    
-    return new ValidationError('Datos de entrada inválidos', errors);
+    return new ValidationError('Datos de entrada inválidos', details);
   }
 
-  // Error de cast (ID inválido)
-  if (error.name === 'CastError') {
-    return new ValidationError(`ID inválido: ${error.value}`);
+  // Cast de ObjectId inválido
+  if (error?.name === 'CastError') {
+    return new ValidationError(`ID inválido: ${error?.value}`);
   }
 
-  // Error de duplicado (unique constraint)
-  if (error.code === 11000) {
-    const field = Object.keys(error.keyPattern)[0];
-    const value = error.keyValue[field];
-    return new ConflictError(`El ${field} '${value}' ya existe`);
+  // Unique index duplicado
+  if (error?.code === 11000 || (error?.name === 'MongoServerError' && error?.code === 11000)) {
+    const field = Object.keys(error?.keyPattern || {})[0] || 'campo';
+    const value = error?.keyValue?.[field];
+    return new ConflictError(`El ${field}${value ? ` '${value}'` : ''} ya existe`);
   }
 
-  // Error de conexión a MongoDB
-  if (error.name === 'MongoNetworkError' || error.name === 'MongoTimeoutError') {
+  // Problemas de conexión/selección de servidor (típico en serverless frío)
+  if (
+    error?.name === 'MongoNetworkError' ||
+    error?.name === 'MongoTimeoutError' ||
+    error?.name === 'MongooseServerSelectionError'
+  ) {
     return new AppError('Error de conexión a la base de datos', 503, 'DATABASE_ERROR');
   }
 
   return error;
 };
 
-// Función para manejar errores de JWT
+// JWT
 const handleJWTError = (error) => {
-  if (error.name === 'JsonWebTokenError') {
-    return new AuthenticationError('Token inválido');
-  }
-  
-  if (error.name === 'TokenExpiredError') {
-    return new AuthenticationError('Token expirado');
-  }
-  
-  if (error.name === 'NotBeforeError') {
-    return new AuthenticationError('Token no válido aún');
-  }
-  
+  if (error?.name === 'JsonWebTokenError') return new AuthenticationError('Token inválido');
+  if (error?.name === 'TokenExpiredError') return new AuthenticationError('Token expirado');
+  if (error?.name === 'NotBeforeError') return new AuthenticationError('Token no válido aún');
   return error;
 };
 
-// Función para manejar errores de Multer (uploads)
+// Multer (uploads)
 const handleMulterError = (error) => {
-  if (error.code === 'LIMIT_FILE_SIZE') {
-    return new ValidationError('Archivo muy grande', {
-      maxSize: error.field ? `${error.field}: ${error.limit} bytes` : `${error.limit} bytes`
-    });
+  if (error?.code === 'LIMIT_FILE_SIZE') {
+    return new ValidationError('Archivo muy grande', { maxSize: error?.limit });
   }
-  
-  if (error.code === 'LIMIT_FILE_COUNT') {
-    return new ValidationError('Demasiados archivos', {
-      maxFiles: error.limit
-    });
+  if (error?.code === 'LIMIT_FILE_COUNT') {
+    return new ValidationError('Demasiados archivos', { maxFiles: error?.limit });
   }
-  
-  if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-    return new ValidationError('Campo de archivo inesperado', {
-      fieldName: error.field
-    });
+  if (error?.code === 'LIMIT_UNEXPECTED_FILE') {
+    return new ValidationError('Campo de archivo inesperado', { fieldName: error?.field });
   }
-  
   return error;
 };
 
-// Función para sanitizar errores en producción
+/* ────────────────────────────────────────────────────────────
+   Sanitización de respuesta (no exponer detalles en prod)
+──────────────────────────────────────────────────────────── */
 const sanitizeError = (error) => {
-  // En producción, no exponer información sensible
-  if (process.env.NODE_ENV === 'production' && !error.isOperational) {
+  const statusCode = error?.statusCode || 500;
+  const status = error?.status || (String(statusCode).startsWith('4') ? 'fail' : 'error');
+
+  // Si no es operacional y es prod, no exponemos detalles
+  if (process.env.NODE_ENV === 'production' && !error?.isOperational) {
     return {
       message: ERROR_MESSAGES.INTERNAL_ERROR,
       statusCode: 500,
-      status: 'error'
+      status,
     };
   }
-  
+
   return {
-    message: error.message,
-    statusCode: error.statusCode || 500,
-    status: error.status || 'error',
-    ...(error.code && { code: error.code }),
-    ...(error.details && { details: error.details })
+    message: error?.message || ERROR_MESSAGES.INTERNAL_ERROR,
+    statusCode,
+    status,
+    ...(error?.code && { code: error.code }),
+    ...(error?.details && { details: error.details })
   };
 };
 
-// Middleware principal de manejo de errores
+/* ────────────────────────────────────────────────────────────
+   Middleware principal de errores
+──────────────────────────────────────────────────────────── */
 export const errorHandler = (error, req, res, next) => {
-  // Crear copia del error para evitar mutaciones
-  let err = { ...error };
-  err.message = error.message;
+  // Usa SIEMPRE el error original (no clonar con spread)
+  let err = error;
 
-  // Log del error
-  const errorInfo = {
-    message: err.message,
-    stack: err.stack,
+  // Logging (antes de transformar) — evita filtrar secretos
+  const logMeta = {
+    message: err?.message,
+    // En prod no enviamos stack completo
+    stack: process.env.NODE_ENV === 'production' ? undefined : err?.stack,
     url: req.originalUrl,
     method: req.method,
     ip: req.ip,
@@ -164,32 +169,30 @@ export const errorHandler = (error, req, res, next) => {
     timestamp: new Date().toISOString()
   };
 
-  // Determinar nivel de log según el tipo de error
-  if (err.statusCode >= 500) {
-    logger.error('Server Error', errorInfo);
-  } else if (err.statusCode >= 400) {
-    logger.warn('Client Error', errorInfo);
-  } else {
-    logger.info('Error Handled', errorInfo);
-  }
+  const statusForLog = err?.statusCode || 500;
+  if (statusForLog >= 500) logger.error('Server Error', logMeta);
+  else if (statusForLog >= 400) logger.warn('Client Error', logMeta);
+  else logger.info('Error Handled', logMeta);
 
-  // Transformar errores específicos
-  if (err.name === 'ValidationError' || err.name === 'CastError' || err.code === 11000) {
+  // Normalización por tipo de error externo
+  if (err?.name === 'ValidationError' || err?.name === 'CastError' || err?.code === 11000 || err?.name === 'MongoServerError') {
     err = handleMongoError(err);
-  } else if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+  } else if (err?.name === 'JsonWebTokenError' || err?.name === 'TokenExpiredError' || err?.name === 'NotBeforeError') {
     err = handleJWTError(err);
-  } else if (err.code && typeof err.code === 'string' && err.code.startsWith('LIMIT_')) {
+  } else if (typeof err?.code === 'string' && err.code.startsWith('LIMIT_')) {
     err = handleMulterError(err);
   }
 
-  // Sanitizar error para respuesta
-  const sanitizedError = sanitizeError(err);
+  // Si ya se enviaron cabeceras, delegar
+  if (res.headersSent) return next(err);
 
-  // Agregar información adicional en desarrollo
-  if (process.env.NODE_ENV === 'development') {
-    sanitizedError.stack = err.stack;
-    sanitizedError.context = err.context;
-    sanitizedError.requestInfo = {
+  // Sanitiza respuesta
+  const sanitized = sanitizeError(err);
+
+  // Info extra en desarrollo
+  if (process.env.NODE_ENV !== 'production') {
+    sanitized.stack = err?.stack;
+    sanitized.requestInfo = {
       url: req.originalUrl,
       method: req.method,
       params: req.params,
@@ -198,62 +201,49 @@ export const errorHandler = (error, req, res, next) => {
     };
   }
 
-  // Enviar respuesta de error
-  res.status(sanitizedError.statusCode).json({
+  res.status(sanitized.statusCode).json({
     success: false,
-    error: sanitizedError.message,
-    ...(sanitizedError.code && { code: sanitizedError.code }),
-    ...(sanitizedError.details && { details: sanitizedError.details }),
-    ...(process.env.NODE_ENV === 'development' && sanitizedError.stack && { stack: sanitizedError.stack }),
-    ...(process.env.NODE_ENV === 'development' && sanitizedError.context && { context: sanitizedError.context }),
-    ...(process.env.NODE_ENV === 'development' && sanitizedError.requestInfo && { requestInfo: sanitizedError.requestInfo }),
+    error: sanitized.message,
+    ...(sanitized.code && { code: sanitized.code }),
+    ...(sanitized.details && { details: sanitized.details }),
+    ...(sanitized.stack && { stack: sanitized.stack }),
+    ...(sanitized.requestInfo && { requestInfo: sanitized.requestInfo }),
     timestamp: new Date().toISOString()
   });
 };
 
-// Middleware para capturar rutas no encontradas
-export const notFoundHandler = (req, res, next) => {
-  const error = new NotFoundError(`Ruta ${req.originalUrl} no encontrada`);
-  next(error);
+/* ────────────────────────────────────────────────────────────
+   404 handler
+──────────────────────────────────────────────────────────── */
+export const notFoundHandler = (req, _res, next) => {
+  next(new NotFoundError(`Ruta ${req.originalUrl} no encontrada`));
 };
 
-// Función helper para crear errores consistentes
-export const createError = (message, statusCode = 500, code = null, details = null) => {
-  return new AppError(message, statusCode, code, details);
-};
+/* ────────────────────────────────────────────────────────────
+   Helpers útiles
+──────────────────────────────────────────────────────────── */
+export const createError = (message, statusCode = 500, code = null, details = null) =>
+  new AppError(message, statusCode, code, details);
 
-// Wrapper para capturar errores async sin try/catch
-export const catchAsync = (fn) => {
-  return (req, res, next) => {
-    fn(req, res, next).catch(next);
-  };
-};
+export const catchAsync = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
 
-// Función para validar y lanzar errores de negocio
 export const throwIf = (condition, message, statusCode = 400, code = null) => {
-  if (condition) {
-    throw new AppError(message, statusCode, code);
-  }
+  if (condition) throw new AppError(message, statusCode, code);
 };
 
-// Función para validar recursos existentes
 export const throwIfNotFound = (resource, message = ERROR_MESSAGES.NOT_FOUND) => {
-  if (!resource) {
-    throw new NotFoundError(message);
-  }
+  if (!resource) throw new NotFoundError(message);
   return resource;
 };
 
-// Función para validar permisos
 export const throwIfForbidden = (condition, message = ERROR_MESSAGES.ACCESS_DENIED) => {
-  if (condition) {
-    throw new AuthorizationError(message);
-  }
+  if (condition) throw new AuthorizationError(message);
 };
 
-// Middleware para transformar respuestas exitosas
+// Respuesta de éxito consistente (útil en controladores)
 export const successHandler = (data, message = 'Operación exitosa', statusCode = 200) => {
-  return (req, res) => {
+  return (_req, res) => {
     res.status(statusCode).json({
       success: true,
       message,
@@ -263,45 +253,53 @@ export const successHandler = (data, message = 'Operación exitosa', statusCode 
   };
 };
 
-// Función para manejar errores en promesas
+/* ────────────────────────────────────────────────────────────
+   Manejo global (no matar proceso en Vercel)
+──────────────────────────────────────────────────────────── */
+const IS_VERCEL = process.env.VERCEL === '1';
+
 export const handlePromiseRejection = () => {
   process.on('unhandledRejection', (reason, promise) => {
     logger.error('Unhandled Promise Rejection', {
-      reason: reason?.message || reason,
-      stack: reason?.stack,
-      promise: promise.toString()
+      reason: reason?.message || String(reason),
+      stack: process.env.NODE_ENV === 'production' ? undefined : reason?.stack,
+      promise: String(promise)
     });
-    
-    console.log('💥 Unhandled Promise Rejection. Shutting down...');
-    process.exit(1);
+    if (!IS_VERCEL) {
+      console.log('💥 Unhandled Rejection.');
+      // En servidores propios podrías terminar el proceso:
+      // process.exit(1);
+    }
   });
 };
 
-// Función para manejar excepciones no capturadas
 export const handleUncaughtException = () => {
-  process.on('uncaughtException', (error) => {
+  process.on('uncaughtException', (err) => {
     logger.error('Uncaught Exception', {
-      error: error.message,
-      stack: error.stack
+      error: err?.message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : err?.stack
     });
-    
-    console.log('💥 Uncaught Exception. Shutting down...');
-    process.exit(1);
+    if (!IS_VERCEL) {
+      console.log('💥 Uncaught Exception.');
+      // En servidores propios podrías terminar el proceso:
+      // process.exit(1);
+    }
   });
 };
 
-// Función para configurar manejo global de errores
 export const setupGlobalErrorHandling = () => {
   handleUncaughtException();
   handlePromiseRejection();
 };
 
-// Middleware para logging de errores específico
-export const errorLogger = (error, req, res, next) => {
-  const errorLog = {
-    message: error.message,
-    statusCode: error.statusCode || 500,
-    stack: error.stack,
+/* ────────────────────────────────────────────────────────────
+   Middleware de log de errores (opcional si ya logueas en errorHandler)
+──────────────────────────────────────────────────────────── */
+export const errorLogger = (error, req, _res, next) => {
+  const meta = {
+    message: error?.message,
+    statusCode: error?.statusCode || 500,
+    stack: process.env.NODE_ENV === 'production' ? undefined : error?.stack,
     url: req.originalUrl,
     method: req.method,
     ip: req.ip,
@@ -310,14 +308,9 @@ export const errorLogger = (error, req, res, next) => {
     timestamp: new Date().toISOString()
   };
 
-  // Log según severidad
-  if (error.statusCode >= 500) {
-    logger.error('Application Error', errorLog);
-  } else if (error.statusCode >= 400) {
-    logger.warn('Client Error', errorLog);
-  } else {
-    logger.info('Handled Error', errorLog);
-  }
+  if ((error?.statusCode || 500) >= 500) logger.error('Application Error', meta);
+  else if ((error?.statusCode || 500) >= 400) logger.warn('Client Error', meta);
+  else logger.info('Handled Error', meta);
 
   next(error);
 };

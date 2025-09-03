@@ -80,6 +80,12 @@ function matchesPatterns(origin) {
   return PATTERNS.some((re) => re.test(origin));
 }
 
+// Activa previews de Vercel automáticamente en deploys de preview
+if (process.env.VERCEL === '1' && process.env.VERCEL_ENV !== 'production') {
+  PATTERNS.push(/^https:\/\/[a-z0-9-]+\.vercel\.app$/);
+}
+
+
 function isAllowed(origin) {
   if (!origin) return true; // same-origin, curl, Postman
   const o = normalizeOrigin(origin);

@@ -9,8 +9,7 @@
  */
 
 import dotenv from 'dotenv';
-dotenv.config(); // ✅ Primero`
-
+dotenv.config(); // ✅ Primero
 
 // Logger simple (puedes cambiar a tu logger real)
 const logger = console;
@@ -44,7 +43,9 @@ const checkNodeVersion = () => {
 
 const checkEnvironmentVariables = () => {
   if (!process.env.NODE_ENV) process.env.NODE_ENV = 'development';
-  const required = ['MONGODB_URI', 'JWT_SECRET'];
+  // Permite omitir DB en local con SKIP_DB=true
+  const requireDb = process.env.SKIP_DB !== 'true';
+  const required = ['JWT_SECRET', ...(requireDb ? ['MONGODB_URI'] : [])];
   const missing = required.filter((k) => !process.env[k]);
   if (missing.length) {
     logger.error(`❌ Variables de entorno faltantes: ${missing.join(', ')}`);
@@ -184,7 +185,7 @@ async function shutdown(signal, err) {
           logger.info('✅ Conexiones a DB cerradas (config/database/index.js)');
         }
       } catch {
-        // silencioso: no existe o no exporta closeDatabases
+        // silencioso
       }
     }
 
@@ -213,9 +214,12 @@ if (NODE_ENV === 'development') {
 }
 
 /* ----------------------------- Bootstrap ----------------------------- */
-main().catch((err) => {
-  logger.error('❌ Error no manejado en bootstrap:', err);
-  process.exit(1);
-});
+// ⚠️ En Vercel NO arrancamos el servidor (serverless)
+if (!process.env.VERCEL) {
+  main().catch((err) => {
+    logger.error('❌ Error no manejado en bootstrap:', err);
+    process.exit(1);
+  });
+}
 
 export default main;

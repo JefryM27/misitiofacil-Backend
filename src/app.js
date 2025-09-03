@@ -2,7 +2,8 @@
 // ─────────────────────────────────────────────────────────────
 // Loads env, configures security (Helmet/CORS), rate limits,
 // parsers, logging, routes (/api), Swagger (/api-docs),
-// static files (/uploads in dev), health endpoints and DB connection.
+// static files (/uploads in dev), health endpoints.
+// DB: lazy connect only for /api (serverless-friendly).
 // Exports startServer(), closeDatabase() and the Express app.
 // ─────────────────────────────────────────────────────────────
 
@@ -22,6 +23,9 @@ import swaggerSpec from './config/docs/swagger.js';
 
 import { config, constants, logger, systemLogger } from './config/index.js';
 import { errorHandler, notFoundHandler } from './middleware/index.js';
+
+// ✅ usa el helper serverless-friendly
+import { connectMongoDB, closeMongoDB } from './config/database/mongodb.js';
 
 // Pull environment constants (fallbacks included)
 const { PORT = 3001, NODE_ENV = 'development' } = constants || {};
@@ -63,56 +67,6 @@ app.use(
 // ─────────────────────────────────────────────────────────────
 app.use(compression());
 applyCors(app);
-
-// ─────────────────────────────────────────────────────────────
-// DB connection (serverless-friendly)
-// - On Vercel we don't run startServer(); connect on first request.
-// - Reuse connection while the runtime stays warm.
-// ─────────────────────────────────────────────────────────────
-const connectDatabase = async () => {
-  const mongoUri = config?.database?.mongodb?.uri;
-  if (!mongoUri) throw new Error('MONGODB_URI is not defined in config');
-  if (mongoUri.includes('<db_password>')) throw new Error('MONGODB_URI contains placeholder <db_password>');
-
-  try {
-    if (mongoose.connection.readyState === 1) return; // already connected
-    const start = Date.now();
-    const conn = await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: config?.database?.mongodb?.timeoutMs || 15000,
-      maxPoolSize: config?.database?.mongodb?.maxPoolSize || 10,
-      socketTimeoutMS: 45000,
-      retryWrites: true,
-      w: 'majority'
-    });
-    logger.info('✅ MongoDB connected', {
-      host: conn.connection.host,
-      db: conn.connection.name,
-      tookMs: Date.now() - start
-    });
-
-    mongoose.connection.on('error', (err) => logger.error('❌ Mongo error:', err?.message || err));
-    mongoose.connection.on('disconnected', () => logger.warn('⚠️ MongoDB disconnected'));
-    mongoose.connection.on('reconnected', () => logger.info('🔄 MongoDB reconnected'));
-  } catch (error) {
-    logger.error('❌ MONGODB ERROR:', error?.message || error);
-    if (isProd) throw error;
-    logger.warn('ℹ️ Continuing without DB (development). /health will show ERROR.');
-  }
-};
-
-// Connect once per runtime before handling routes
-let mongoReadyPromise;
-app.use(async (_req, _res, next) => {
-  try {
-    if (mongoose.connection.readyState !== 1) {
-      mongoReadyPromise ??= connectDatabase();
-      await mongoReadyPromise;
-    }
-    next();
-  } catch (e) {
-    next(e);
-  }
-});
 
 // ─────────────────────────────────────────────────────────────
 // Rate limiting (global + tighter for /api/auth) with real IP
@@ -179,7 +133,7 @@ if (!isProd && process.env.DEBUG_ROUTES === 'true') {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Basic info endpoints
+// Basic info endpoints (no DB required)
 // ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   const health = {
@@ -228,10 +182,20 @@ app.get('/', (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// API routes (single mount via routes/index.js)
+// API routes (lazy DB connect only for /api)
 // ─────────────────────────────────────────────────────────────
 import apiRoutes from './routes/index.js';
-app.use('/api', apiRoutes);
+let mongoReadyPromise;
+const ensureDb = async (_req, _res, next) => {
+  try {
+    mongoReadyPromise ??= connectMongoDB(); // cachea la promesa/conn
+    await mongoReadyPromise;
+    next();
+  } catch (e) {
+    next(e);
+  }
+};
+app.use('/api', ensureDb, apiRoutes);
 
 // ─────────────────────────────────────────────────────────────
 // Static files (dev only; prod must use Cloudinary/S3)
@@ -261,7 +225,7 @@ app.use(errorHandler);
 // ─────────────────────────────────────────────────────────────
 export const closeDatabase = async () => {
   try {
-    await mongoose.connection.close().catch(() => {});
+    await closeMongoDB();
     logger.info('✅ MongoDB connection closed');
   } catch (e) {
     logger.warn('⚠️ Error while closing MongoDB:', e?.message || e);
@@ -272,10 +236,14 @@ export const closeDatabase = async () => {
 // Local bootstrap (Vercel does NOT use this)
 // ─────────────────────────────────────────────────────────────
 export const startServer = async () => {
-  try {
-    await connectDatabase();
-  } catch (e) {
-    throw e;
+  // En local puedes conectar aquí o dejar que ensureDb lo haga bajo demanda.
+  if (process.env.VERCEL !== '1') {
+    try {
+      mongoReadyPromise ??= connectMongoDB();
+      await mongoReadyPromise;
+    } catch (e) {
+      throw e;
+    }
   }
 
   const effPort = Number(PORT || 3001);
