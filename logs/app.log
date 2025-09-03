@@ -7296,3 +7296,27 @@ SyntaxError: The requested module '../middleware/security.js' does not provide a
 [2025-09-03 03:38:56] [INFO] 🌍 Env:        development
 [2025-09-03 03:38:56] [INFO] 🔗 API base:   http://localhost:3001/api
 [2025-09-03 03:38:56] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":30692,"rssMB":114}
+[2025-09-03 03:47:42] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-03 03:47:42] [INFO] 🌍 Env:        development
+[2025-09-03 03:47:42] [INFO] 🚀 Server listening on port 3001
+[2025-09-03 03:47:42] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-03 03:47:42] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":12660,"rssMB":114}
+[2025-09-03 03:47:42] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-03 03:58:55] [INFO] 🚀 Server listening on port 3001
+[2025-09-03 03:58:55] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-03 03:58:55] [INFO] 🌍 Env:        development
+[2025-09-03 03:58:55] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-03 03:58:55] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":14860,"rssMB":114}
+[2025-09-03 03:58:55] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-03 03:59:19] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-03 03:59:19] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-03 03:59:19] [INFO] 🌍 Env:        development
+[2025-09-03 03:59:19] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":6588,"rssMB":113}
+[2025-09-03 03:59:19] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-03 03:59:19] [INFO] 🚀 Server listening on port 3001
+[2025-09-03 04:00:24] [INFO] 📖 Docs:       http://localhost:3001/api-docs
+[2025-09-03 04:00:24] [INFO] 🏥 Health:     http://localhost:3001/health
+[2025-09-03 04:00:24] [INFO] 🌍 Env:        development
+[2025-09-03 04:00:24] [INFO] 🚀 Server listening on port 3001
+[2025-09-03 04:00:24] [INFO] 🔗 API base:   http://localhost:3001/api
+[2025-09-03 04:00:24] [INFO] SUCCESS: Server started on port 3001 | {"environment":"development","pid":26928,"rssMB":114}

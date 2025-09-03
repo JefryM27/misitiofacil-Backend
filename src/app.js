@@ -30,6 +30,9 @@ import { connectMongoDB, closeMongoDB } from './config/database/mongodb.js';
 const { PORT = 3001, NODE_ENV = 'development' } = constants || {};
 const isProd = NODE_ENV === 'production';
 
+// ✅ DETECCIÓN VERCEL - clave para no ejecutar startServer
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.VERCEL_URL;
+
 // ─────────────────────────────────────────────────────────────
 // App
 // ─────────────────────────────────────────────────────────────
@@ -68,7 +71,7 @@ app.use(compression());
 applyCors(app);
 
 // ─────────────────────────────────────────────────────────────
-// Rate limiting
+// Rate limiting (más permisivo en Vercel para cold starts)
 // ─────────────────────────────────────────────────────────────
 const getRealIp = (req) =>
   req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
@@ -77,7 +80,8 @@ const getRealIp = (req) =>
 
 const generalLimiter = rateLimit({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
-  max: Number(process.env.RATE_LIMIT_MAX_REQUESTS || (isProd ? 100 : 1000)),
+  // ✅ Más permisivo en Vercel debido a cold starts
+  max: Number(process.env.RATE_LIMIT_MAX_REQUESTS || (isVercel ? 200 : isProd ? 100 : 1000)),
   message: { error: 'Too many requests from this IP, try again in 15 minutes.', retryAfter: '15 minutes' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -88,7 +92,7 @@ app.use(generalLimiter);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: isVercel ? 10 : 5, // ✅ Más permisivo en Vercel
   message: { error: 'Too many login attempts, try again in 15 minutes.', retryAfter: '15 minutes' },
   skipSuccessfulRequests: true,
   keyGenerator: getRealIp,
@@ -115,14 +119,21 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-if (NODE_ENV === 'development') {
+// ✅ Logging simplificado en Vercel
+if (isVercel) {
+  // En Vercel, usar logging mínimo
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.originalUrl}`);
+    next();
+  });
+} else if (NODE_ENV === 'development') {
   app.use(morgan('dev'));
 } else {
   app.use(morgan('combined', { skip: (_req, res) => res.statusCode < 400 }));
 }
 
-// Debug opcional
-if (!isProd && process.env.DEBUG_ROUTES === 'true') {
+// Debug opcional (NO en Vercel para evitar ruido)
+if (!isProd && !isVercel && process.env.DEBUG_ROUTES === 'true') {
   app.use((req, _res, next) => {
     console.log(`🔍 ${req.method} ${req.originalUrl}`);
     console.log('Content-Type:', req.headers['content-type']);
@@ -141,6 +152,7 @@ app.get('/health', (_req, res) => {
     environment: NODE_ENV,
     version: config?.app?.version || '1.0.0',
     uptime: Math.floor(process.uptime()),
+    platform: isVercel ? 'vercel' : 'traditional',
     memory: {
       used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
       total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
@@ -155,6 +167,7 @@ app.get('/api', (_req, res) => {
     name: 'MiSitioFácil API',
     version: config?.app?.version || '1.0.0',
     description: 'API REST for MiSitioFácil',
+    platform: isVercel ? 'Vercel Serverless' : 'Traditional Server',
     endpoints: {
       auth: `/api/auth`,
       businesses: `/api/business`,
@@ -175,6 +188,7 @@ app.get('/', (_req, res) => {
     message: '🎉 MiSitioFácil API is running!',
     version: config?.app?.version || '1.0.0',
     environment: NODE_ENV,
+    platform: isVercel ? 'Vercel' : 'Traditional',
     timestamp: new Date().toISOString(),
     docs: `/api-docs`
   });
@@ -187,7 +201,7 @@ import apiRoutes from './routes/index.js';
 
 let mongoReadyPromise;
 
-// ⬇️ endurecido: responde 503 si falta MONGODB_URI o si la conexión falla
+// ✅ Mejorado: manejo de errores más robusto para Vercel
 const ensureDb = async (req, res, next) => {
   const mongoUri = config?.database?.mongodb?.uri;
   if (!mongoUri || mongoUri.includes('<db_password>')) {
@@ -198,15 +212,21 @@ const ensureDb = async (req, res, next) => {
     });
   }
   try {
-    mongoReadyPromise ??= connectMongoDB();
+    // ✅ En Vercel, usar conexión singleton para evitar múltiples conexiones
+    if (!mongoReadyPromise) {
+      mongoReadyPromise = connectMongoDB();
+    }
     await mongoReadyPromise;
     next();
   } catch (e) {
-    logger.error('❌ Mongo connection error', { message: e?.message });
+    logger.error('❌ Mongo connection error', { message: e?.message, isVercel });
+    // ✅ Reset promise en caso de error para reintento
+    mongoReadyPromise = null;
     return res.status(503).json({
       success: false,
       error: 'Database connection error',
-      code: 'DATABASE_CONNECTION_ERROR'
+      code: 'DATABASE_CONNECTION_ERROR',
+      details: isVercel ? 'Serverless cold start issue' : e?.message
     });
   }
 };
@@ -214,9 +234,9 @@ const ensureDb = async (req, res, next) => {
 app.use('/api', ensureDb, apiRoutes);
 
 // ─────────────────────────────────────────────────────────────
-// Static (dev only)
+// Static (SOLO en dev local, NO en Vercel)
 // ─────────────────────────────────────────────────────────────
-if (!isProd) {
+if (!isProd && !isVercel) {
   app.use('/uploads', express.static(config?.storage?.uploadPath || 'uploads'));
 }
 
@@ -249,16 +269,31 @@ export const closeDatabase = async () => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Local bootstrap (Vercel NO usa esto)
+// ✅ CLAVE: Local bootstrap (Vercel NO usa esto)
 // ─────────────────────────────────────────────────────────────
 export const startServer = async () => {
-  if (process.env.VERCEL !== '1') {
+  // ✅ NO ejecutar servidor HTTP en Vercel
+  if (isVercel) {
+    console.log('🔧 Running on Vercel - serverless mode, skipping HTTP server');
+    // Solo conectar DB si es necesario para warmup
     try {
-      mongoReadyPromise ??= connectMongoDB();
-      await mongoReadyPromise;
+      if (process.env.VERCEL_WARMUP === 'true') {
+        mongoReadyPromise ??= connectMongoDB();
+        await mongoReadyPromise;
+        console.log('✅ Database warmed up for Vercel');
+      }
     } catch (e) {
-      throw e;
+      console.warn('⚠️ Vercel warmup failed:', e.message);
     }
+    return app; // Retornar app para uso serverless
+  }
+
+  // ✅ Modo tradicional (desarrollo/Render/otras plataformas)
+  try {
+    mongoReadyPromise ??= connectMongoDB();
+    await mongoReadyPromise;
+  } catch (e) {
+    throw e;
   }
 
   const effPort = Number(PORT || 3001);
@@ -278,4 +313,5 @@ export const startServer = async () => {
   return server;
 };
 
+// ✅ IMPORTANTE: Export por defecto para Vercel
 export default app;

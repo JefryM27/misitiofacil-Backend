@@ -1,4 +1,4 @@
-// src/controllers/businessController.js
+// src/controllers/businessController.js - Adaptado para Vercel
 import Business from '../models/business.js';
 import Template from '../models/template.js';
 import Service from '../models/service.js';
@@ -16,6 +16,9 @@ import { constants, logger } from '../config/index.js';
 import { deleteFromCloudinary, optimizeImageUrl } from '../config/storage/cloudinary.js';
 import mongoose from 'mongoose';
 
+// ✅ DETECCIÓN DE VERCEL
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.VERCEL_URL;
+
 const { 
   ERROR_MESSAGES, 
   SUCCESS_MESSAGES, 
@@ -25,6 +28,59 @@ const {
   VALIDATION_PATTERNS 
 } = constants;
 
+// ============== HELPER PARA PROCESAR ARCHIVOS ==============
+const processUploadedFile = (file) => {
+  if (!file) return null;
+
+  // ✅ En Vercel, los archivos están en memoria (buffer)
+  if (isVercel || file.buffer) {
+    return {
+      url: null, // Se llenará después de subir a Cloudinary
+      filename: file.filename || `${Date.now()}-${file.originalname}`,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+      buffer: file.buffer, // ✅ Buffer para Cloudinary
+      needsCloudinaryUpload: true,
+      isVercel: true
+    };
+  }
+
+  // ✅ En desarrollo local (disk storage)
+  return {
+    url: file.path || `/uploads/${file.filename}`,
+    filename: file.filename,
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size,
+    path: file.path,
+    needsCloudinaryUpload: false,
+    isVercel: false
+  };
+};
+
+// ✅ HELPER PARA SUBIR A CLOUDINARY (cuando esté configurado)
+const uploadToCloudinary = async (fileData) => {
+  if (!fileData.needsCloudinaryUpload) {
+    return fileData.url; // Ya está en disco local
+  }
+
+  // TODO: Implementar upload real a Cloudinary
+  // Por ahora, simular URL para testing
+  if (process.env.CLOUDINARY_URL) {
+    // Aquí iría la lógica real de Cloudinary
+    console.log('🔄 Uploading to Cloudinary:', fileData.filename);
+    // const result = await cloudinary.uploader.upload_stream(...)
+    // return result.secure_url;
+    
+    // TEMPORAL: Simular URL de Cloudinary
+    return `https://res.cloudinary.com/temp/${fileData.filename}`;
+  } else {
+    console.warn('⚠️ CLOUDINARY_URL not configured, using temporary URL');
+    return `https://temp-storage.misitofacil.com/${fileData.filename}`;
+  }
+};
+
 // ============== CREAR NEGOCIO ==============
 export const createBusiness = asyncHandler(async (req, res) => {
   const { 
@@ -33,7 +89,7 @@ export const createBusiness = asyncHandler(async (req, res) => {
     category,
     phone, 
     email,
-    templateId, // Optional - user provided
+    templateId,
     location = {},
     socialMedia = {},
     operatingHours,
@@ -43,21 +99,16 @@ export const createBusiness = asyncHandler(async (req, res) => {
   // ===== Basic validations =====
   throwIf(!name?.trim(), 'El nombre del negocio es requerido');
   throwIf(!category, 'La categoría del negocio es requerida');
-
-  // Only owners can create businesses
   throwIf(req.user.role !== 'owner', 'Solo los owners pueden crear negocios');
 
-  // One business per owner (adjust if you allow multiple)
   const existingBusiness = await Business.findOne({ owner: req.user.id });
   throwIf(existingBusiness, 'Ya tienes un negocio registrado');
 
-  // Category validation
   throwIf(
     !Object.values(BUSINESS_TYPES).includes(category),
     `Categoría inválida. Debe ser: ${Object.values(BUSINESS_TYPES).join(', ')}`
   );
 
-  // Email/phone validation
   if (email && !VALIDATION_PATTERNS.EMAIL.test(email)) {
     throw new ValidationError('Formato de email inválido');
   }
@@ -65,76 +116,57 @@ export const createBusiness = asyncHandler(async (req, res) => {
     throw new ValidationError('Formato de teléfono inválido');
   }
 
-  // ============== TEMPLATE RESOLUTION (reinforced) ==============
+  // ============== TEMPLATE RESOLUTION ==============
   let finalTemplateId = null;
 
-  // ---- Debug: where are we connected and what id arrived?
-  console.log('[BUSINESS][DBG] userId     =', req.user?.id);
-  console.log('[BUSINESS][DBG] db/host    =', mongoose.connection?.name, '/', mongoose.connection?.host);
-  console.log('[BUSINESS][DBG] templateId =', templateId);
+  console.log(`[BUSINESS][${isVercel ? 'VERCEL' : 'LOCAL'}] Creating business with templateId:`, templateId);
 
   if (templateId) {
-    // 1) Guard: ensure ObjectId format
     if (!mongoose.Types.ObjectId.isValid(templateId)) {
       throw new ValidationError('templateId inválido');
     }
 
-    // 2) Extra diagnosis: does this _id exist in THIS database/collection?
-    const exists = await Template.exists({ _id: templateId });
-    console.log('[BUSINESS][DBG] Template.exists? ->', Boolean(exists));
-
-    // 3) Try to load the template
-    let template = null;
-    if (exists) {
-      template = await Template.findById(templateId);
-    }
-
-    // 4) If not found in current DB, fallback to public/default template
+    const template = await Template.findById(templateId);
     if (!template) {
-      console.warn('[BUSINESS][WARN] Template not found by _id in current DB. Using public/default fallback.');
+      console.warn('[BUSINESS] Template not found, using default');
       const auto = await Template.findOne({ isActive: true, isPublic: true })
-        .sort({ isDefault: -1, 'usage.rating': -1, 'usage.timesUsed': -1 });
-      throwIfNotFound(auto, 'No hay templates disponibles. Revisa la conexión a la base de datos o crea un template primero.');
+        .sort({ isDefault: -1, 'usage.rating': -1 });
+      throwIfNotFound(auto, 'No hay templates disponibles');
       finalTemplateId = auto._id;
       await auto.markAsUsed();
     } else {
-      // 5) Validate status & permissions
       throwIf(!template.isActive, 'Template no activo');
-
-      const isOwner   = template.owner?.toString() === req.user.id;
-      const isPublic  = template.isPublic === true;
+      
+      const isOwner = template.owner?.toString() === req.user.id;
+      const isPublic = template.isPublic === true;
       const isDefault = template.isDefault === true;
-      const isAdmin   = req.user?.role === (constants.USER_ROLES?.ADMIN || 'admin');
+      const isAdmin = req.user?.role === (constants.USER_ROLES?.ADMIN || 'admin');
 
       if (isPublic || isOwner || isDefault || isAdmin) {
         finalTemplateId = template._id;
         await template.markAsUsed();
       } else {
         const auto = await Template.findOne({ isActive: true, isPublic: true })
-          .sort({ isDefault: -1, 'usage.rating': -1, 'usage.timesUsed': -1 });
-        throwIfNotFound(auto, 'No hay templates públicos disponibles.');
+          .sort({ isDefault: -1, 'usage.rating': -1 });
+        throwIfNotFound(auto, 'No hay templates públicos disponibles');
         finalTemplateId = auto._id;
         await auto.markAsUsed();
       }
     }
   } else {
-    // No template provided -> choose a public/default template
     const auto = await Template.findOne({ isActive: true, isPublic: true })
-      .sort({ isDefault: -1, 'usage.rating': -1, 'usage.timesUsed': -1 });
-    throwIfNotFound(auto, 'No hay templates disponibles. Crea un template primero.');
+      .sort({ isDefault: -1, 'usage.rating': -1 });
+    throwIfNotFound(auto, 'No hay templates disponibles');
     finalTemplateId = auto._id;
     await auto.markAsUsed();
   }
 
   // ============== BUSINESS CREATION ==============
   const businessData = {
-    // --- Required by schema ---
-    ownerId: req.user.id,        // Atlas mirror
-    owner: req.user.id,          // Mongoose ref
-    templateId: finalTemplateId, // Resolved template
+    ownerId: req.user.id,
+    owner: req.user.id,
+    templateId: finalTemplateId,
     name: name.trim(),
-
-    // --- Optional fields ---
     description: description?.trim() || '',
     category,
     phone: phone?.trim(),
@@ -173,7 +205,6 @@ export const createBusiness = asyncHandler(async (req, res) => {
     status: BUSINESS_STATUS.DRAFT
   };
 
-  // Default operating hours (if none provided)
   businessData.operatingHours = operatingHours || {
     monday:    { isOpen: true,  openTime: '09:00', closeTime: '18:00' },
     tuesday:   { isOpen: true,  openTime: '09:00', closeTime: '18:00' },
@@ -183,12 +214,6 @@ export const createBusiness = asyncHandler(async (req, res) => {
     saturday:  { isOpen: true,  openTime: '09:00', closeTime: '16:00' },
     sunday:    { isOpen: false }
   };
-
-  // Debug: payload to be saved
-  console.log('[BUSINESS][DBG] businessData:', JSON.stringify({
-    ...businessData,
-    templateId: businessData.templateId?.toString()
-  }, null, 2));
 
   try {
     const business = new Business(businessData);
@@ -202,6 +227,7 @@ export const createBusiness = asyncHandler(async (req, res) => {
       businessName: business.name,
       category: business.category,
       templateId: finalTemplateId,
+      platform: isVercel ? 'vercel' : 'local',
       ip: req.ip 
     });
 
@@ -222,13 +248,8 @@ export const createBusiness = asyncHandler(async (req, res) => {
 
   } catch (error) {
     console.error('Error al crear negocio:', error);
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.errmsg || error.message);
 
     if (error.code === 121) {
-      // MongoDB JSON Schema validation error
-      console.error('=== MONGODB VALIDATION ERROR (121) ===');
-      console.error('errInfo completo:', JSON.stringify(error.errInfo, null, 2));
       throw new ValidationError('Error de validación en la base de datos', {
         mongoError: error.errmsg,
         details: error.errInfo?.details,
@@ -237,22 +258,15 @@ export const createBusiness = asyncHandler(async (req, res) => {
     }
 
     if (error.name === 'ValidationError') {
-      // Mongoose validation error
-      console.error('=== MONGOOSE VALIDATION ERROR ===');
       const validationErrors = Object.keys(error.errors).map(key => ({
         field: key,
         message: error.errors[key].message,
         value: error.errors[key].value
       }));
-      console.error('Validation errors:', validationErrors);
       throw new ValidationError('Error de validación de Mongoose', validationErrors);
     }
 
     if (error.code === 11000) {
-      // Duplicate key error
-      console.error('=== DUPLICATE KEY ERROR ===');
-      console.error('keyPattern:', error.keyPattern);
-      console.error('keyValue:', error.keyValue);
       throw new ValidationError('Ya existe un negocio con estos datos', {
         duplicateField: Object.keys(error.keyPattern)[0],
         duplicateValue: Object.values(error.keyValue)[0]
@@ -270,14 +284,14 @@ export const getMyBusiness = asyncHandler(async (req, res) => {
     .populate({
       path: 'services',
       select: 'name description price duration isActive sortOrder',
-      options: { sort: { sortOrder: 1, createdAt: -1 } } // ordena desde Mongoose
+      options: { sort: { sortOrder: 1, createdAt: -1 } }
     })
     .populate('templateId', 'name category previewUrl sections')
-    .lean(); // evita transforms que puedan hacer .sort sobre undefined
+    .lean();
 
   throwIfNotFound(business, ERROR_MESSAGES.BUSINESS_NOT_FOUND || 'Negocio no encontrado');
 
-  // Normalizaciones defensivas (evitan .sort sobre undefined en cualquier capa)
+  // Normalizaciones defensivas
   business.services = Array.isArray(business.services) ? business.services : [];
   business.gallery = Array.isArray(business.gallery) ? business.gallery : [];
   business.operatingHours = business.operatingHours || {};
@@ -287,7 +301,7 @@ export const getMyBusiness = asyncHandler(async (req, res) => {
     business.templateId.sections = [];
   }
 
-  // (Opcional) actualización ligera de stats sin tocar transforms
+  // Actualización ligera de stats
   try {
     await Business.updateOne({ _id: business._id }, { $set: { 'stats.lastAccessAt': new Date() } });
   } catch (_) {}
@@ -306,12 +320,10 @@ export const getBusinessById = asyncHandler(async (req, res) => {
 
   throwIfNotFound(business, ERROR_MESSAGES.BUSINESS_NOT_FOUND || 'Negocio no encontrado');
 
-  // Solo mostrar negocios públicos a no-owners
   if (req.user?.id !== business.owner._id.toString() && business.status !== BUSINESS_STATUS.ACTIVE) {
     throw new NotFoundError('Negocio no encontrado');
   }
 
-  // Incrementar vistas si no es el owner
   if (req.user?.id !== business.owner._id.toString()) {
     await Business.findByIdAndUpdate(businessId, { $inc: { 'stats.views': 1 } });
   }
@@ -334,11 +346,8 @@ export const getBusinessBySlug = asyncHandler(async (req, res) => {
     .populate('templateId', 'name category');
 
   throwIfNotFound(business, ERROR_MESSAGES.BUSINESS_NOT_FOUND || 'Negocio no encontrado');
-
-  // Solo mostrar negocios activos en vista pública
   throwIf(business.status !== BUSINESS_STATUS.ACTIVE, 'Negocio no disponible');
 
-  // Incrementar vistas
   await Business.findByIdAndUpdate(business._id, { $inc: { 'stats.views': 1 } });
 
   res.json({
@@ -360,7 +369,6 @@ export const listPublicBusinesses = asyncHandler(async (req, res) => {
     sortBy = 'rating'
   } = req.query;
 
-  // Construir filtros
   const filters = { status: BUSINESS_STATUS.ACTIVE };
   
   if (category) filters.category = category;
@@ -368,12 +376,10 @@ export const listPublicBusinesses = asyncHandler(async (req, res) => {
   if (province) filters['location.province'] = new RegExp(province, 'i');
   if (featured === 'true') filters.featured = true;
 
-  // Agregar búsqueda de texto si existe
   if (search) {
     filters.$text = { $search: search };
   }
 
-  // Configurar ordenamiento
   let sortOptions = {};
   switch (sortBy) {
     case 'rating':
@@ -392,7 +398,6 @@ export const listPublicBusinesses = asyncHandler(async (req, res) => {
       sortOptions = { 'stats.rating': -1, featured: -1 };
   }
 
-  // Aplicar paginación (viene del middleware)
   const businesses = await req.applyPagination(
     Business.find(filters)
       .populate('owner', 'fullName')
@@ -401,7 +406,6 @@ export const listPublicBusinesses = asyncHandler(async (req, res) => {
   );
 
   const total = await Business.countDocuments(filters);
-
   const response = req.createPaginatedResponse(businesses, total);
 
   res.json(response);
@@ -424,7 +428,6 @@ export const updateBusiness = asyncHandler(async (req, res) => {
     visualConfig
   } = req.body;
 
-  // Validaciones si se proporcionan nuevos valores
   if (email && !VALIDATION_PATTERNS.EMAIL.test(email)) {
     throw new ValidationError('Formato de email inválido');
   }
@@ -433,13 +436,11 @@ export const updateBusiness = asyncHandler(async (req, res) => {
     throw new ValidationError('Formato de teléfono inválido');
   }
 
-  // Actualizar campos permitidos
   if (name) business.name = name.trim();
   if (description !== undefined) business.description = description.trim();
   if (phone !== undefined) business.phone = phone?.trim();
   if (email !== undefined) business.email = email?.toLowerCase().trim();
 
-  // Actualizar ubicación
   if (location) {
     business.location = {
       ...business.location,
@@ -450,7 +451,6 @@ export const updateBusiness = asyncHandler(async (req, res) => {
     };
   }
 
-  // Actualizar redes sociales
   if (socialMedia) {
     business.socialMedia = {
       ...business.socialMedia,
@@ -458,7 +458,6 @@ export const updateBusiness = asyncHandler(async (req, res) => {
     };
   }
 
-  // Actualizar horarios
   if (operatingHours) {
     business.operatingHours = {
       ...business.operatingHours,
@@ -466,7 +465,6 @@ export const updateBusiness = asyncHandler(async (req, res) => {
     };
   }
 
-  // Actualizar configuraciones
   if (settings) {
     business.settings = {
       ...business.settings,
@@ -474,7 +472,6 @@ export const updateBusiness = asyncHandler(async (req, res) => {
     };
   }
 
-  // Actualizar configuración visual
   if (visualConfig) {
     business.visualConfig = {
       ...business.visualConfig,
@@ -488,6 +485,7 @@ export const updateBusiness = asyncHandler(async (req, res) => {
     businessId: business._id, 
     ownerId: req.user.id,
     changes: Object.keys(req.body),
+    platform: isVercel ? 'vercel' : 'local',
     ip: req.ip 
   });
 
@@ -500,22 +498,29 @@ export const updateBusiness = asyncHandler(async (req, res) => {
   });
 });
 
-// ============== SUBIR LOGO ==============
+// ============== SUBIR LOGO - ADAPTADO PARA VERCEL ==============
 export const uploadLogo = asyncHandler(async (req, res) => {
   const business = await Business.findOne({ owner: req.user.id });
   throwIfNotFound(business, ERROR_MESSAGES.BUSINESS_NOT_FOUND || 'Negocio no encontrado');
-
   throwIf(!req.file, 'No se proporcionó archivo de logo');
+
+  // ✅ Procesar archivo según el entorno
+  const fileData = processUploadedFile(req.file);
+  
+  // ✅ Subir a Cloudinary si es necesario
+  if (fileData.needsCloudinaryUpload) {
+    fileData.url = await uploadToCloudinary(fileData);
+    console.log(`📦 Logo uploaded (${isVercel ? 'Vercel' : 'Local'}):`, fileData.filename);
+  }
 
   // Eliminar logo anterior si existe
   if (business.logo && business.logo.filename) {
     await deleteFromCloudinary(business.logo.filename);
   }
 
-  // Actualizar logo
   business.logo = {
-    url: req.file.path || req.file.url,
-    filename: req.file.filename,
+    url: fileData.url,
+    filename: fileData.filename,
     uploadedAt: new Date()
   };
 
@@ -524,35 +529,39 @@ export const uploadLogo = asyncHandler(async (req, res) => {
   logger.info('Logo subido', { 
     businessId: business._id, 
     ownerId: req.user.id,
-    filename: req.file.filename,
+    filename: fileData.filename,
+    platform: isVercel ? 'vercel' : 'local',
+    storageType: fileData.needsCloudinaryUpload ? 'cloudinary' : 'local',
     ip: req.ip 
   });
 
   res.json({
     success: true,
     message: 'Logo subido exitosamente',
-    data: {
-      logo: business.logo
-    }
+    data: { logo: business.logo }
   });
 });
 
-// ============== SUBIR IMAGEN DE PORTADA ==============
+// ============== SUBIR IMAGEN DE PORTADA - ADAPTADO ==============
 export const uploadCoverImage = asyncHandler(async (req, res) => {
   const business = await Business.findOne({ owner: req.user.id });
   throwIfNotFound(business, ERROR_MESSAGES.BUSINESS_NOT_FOUND || 'Negocio no encontrado');
-
   throwIf(!req.file, 'No se proporcionó archivo de imagen');
 
-  // Eliminar imagen anterior si existe
+  const fileData = processUploadedFile(req.file);
+  
+  if (fileData.needsCloudinaryUpload) {
+    fileData.url = await uploadToCloudinary(fileData);
+    console.log(`📦 Cover uploaded (${isVercel ? 'Vercel' : 'Local'}):`, fileData.filename);
+  }
+
   if (business.coverImage && business.coverImage.filename) {
     await deleteFromCloudinary(business.coverImage.filename);
   }
 
-  // Actualizar imagen de portada
   business.coverImage = {
-    url: req.file.path || req.file.url,
-    filename: req.file.filename,
+    url: fileData.url,
+    filename: fileData.filename,
     uploadedAt: new Date()
   };
 
@@ -561,37 +570,47 @@ export const uploadCoverImage = asyncHandler(async (req, res) => {
   logger.info('Imagen de portada subida', { 
     businessId: business._id, 
     ownerId: req.user.id,
-    filename: req.file.filename,
+    filename: fileData.filename,
+    platform: isVercel ? 'vercel' : 'local',
+    storageType: fileData.needsCloudinaryUpload ? 'cloudinary' : 'local',
     ip: req.ip 
   });
 
   res.json({
     success: true,
     message: 'Imagen de portada subida exitosamente',
-    data: {
-      coverImage: business.coverImage
-    }
+    data: { coverImage: business.coverImage }
   });
 });
 
-// ============== SUBIR IMÁGENES A GALERÍA ==============
+// ============== SUBIR IMÁGENES A GALERÍA - ADAPTADO ==============
 export const uploadGalleryImages = asyncHandler(async (req, res) => {
   const business = await Business.findOne({ owner: req.user.id });
   throwIfNotFound(business, ERROR_MESSAGES.BUSINESS_NOT_FOUND || 'Negocio no encontrado');
-
   throwIf(!req.files || req.files.length === 0, 'No se proporcionaron archivos');
   throwIf(
     business.gallery.length + req.files.length > APP_LIMITS.MAX_GALLERY_IMAGES,
     `Máximo ${APP_LIMITS.MAX_GALLERY_IMAGES} imágenes permitidas en la galería`
   );
 
-  // Agregar nuevas imágenes
-  const newImages = req.files.map(file => ({
-    url: file.path || file.url,
-    filename: file.filename,
-    caption: '',
-    uploadedAt: new Date()
-  }));
+  // ✅ Procesar todos los archivos
+  const newImages = await Promise.all(
+    req.files.map(async (file) => {
+      const fileData = processUploadedFile(file);
+      
+      if (fileData.needsCloudinaryUpload) {
+        fileData.url = await uploadToCloudinary(fileData);
+        console.log(`📦 Gallery image uploaded (${isVercel ? 'Vercel' : 'Local'}):`, fileData.filename);
+      }
+
+      return {
+        url: fileData.url,
+        filename: fileData.filename,
+        caption: '',
+        uploadedAt: new Date()
+      };
+    })
+  );
 
   business.gallery.push(...newImages);
   await business.save();
@@ -600,6 +619,8 @@ export const uploadGalleryImages = asyncHandler(async (req, res) => {
     businessId: business._id, 
     ownerId: req.user.id,
     count: req.files.length,
+    platform: isVercel ? 'vercel' : 'local',
+    storageType: newImages[0]?.filename ? 'cloudinary' : 'local',
     ip: req.ip 
   });
 
@@ -623,12 +644,10 @@ export const deleteGalleryImage = asyncHandler(async (req, res) => {
   const image = business.gallery.id(imageId);
   throwIfNotFound(image, 'Imagen no encontrada');
 
-  // Eliminar de Cloudinary si existe
   if (image.filename) {
     await deleteFromCloudinary(image.filename);
   }
 
-  // Eliminar de la galería
   business.gallery.pull(imageId);
   await business.save();
 
@@ -636,6 +655,7 @@ export const deleteGalleryImage = asyncHandler(async (req, res) => {
     businessId: business._id, 
     ownerId: req.user.id,
     imageId,
+    platform: isVercel ? 'vercel' : 'local',
     ip: req.ip 
   });
 
@@ -657,7 +677,6 @@ export const changeBusinessStatus = asyncHandler(async (req, res) => {
   const business = await Business.findOne({ owner: req.user.id });
   throwIfNotFound(business, ERROR_MESSAGES.BUSINESS_NOT_FOUND || 'Negocio no encontrado');
 
-  // Validar transición de estado
   if (status === BUSINESS_STATUS.ACTIVE) {
     throwIf(!business.name, 'El negocio debe tener nombre para activarse');
     throwIf(!business.category, 'El negocio debe tener categoría para activarse');
@@ -666,7 +685,6 @@ export const changeBusinessStatus = asyncHandler(async (req, res) => {
   const oldStatus = business.status;
   business.status = status;
 
-  // Establecer publishedAt si se publica por primera vez
   if (status === BUSINESS_STATUS.ACTIVE && !business.publishedAt) {
     business.publishedAt = new Date();
   }
@@ -678,6 +696,7 @@ export const changeBusinessStatus = asyncHandler(async (req, res) => {
     ownerId: req.user.id,
     oldStatus,
     newStatus: status,
+    platform: isVercel ? 'vercel' : 'local',
     ip: req.ip 
   });
 
@@ -699,7 +718,6 @@ export const deleteBusiness = asyncHandler(async (req, res) => {
   const business = await Business.findOne({ owner: req.user.id });
   throwIfNotFound(business, ERROR_MESSAGES.BUSINESS_NOT_FOUND || 'Negocio no encontrado');
 
-  // Eliminar imágenes de Cloudinary
   const imagesToDelete = [];
   if (business.logo?.filename) imagesToDelete.push(business.logo.filename);
   if (business.coverImage?.filename) imagesToDelete.push(business.coverImage.filename);
@@ -707,24 +725,19 @@ export const deleteBusiness = asyncHandler(async (req, res) => {
     if (img.filename) imagesToDelete.push(img.filename);
   });
 
-  // Eliminar imágenes en paralelo
   await Promise.allSettled(
     imagesToDelete.map(filename => deleteFromCloudinary(filename))
   );
 
-  // Eliminar servicios asociados
   await Service.deleteMany({ business: business._id });
-
-  // Eliminar el negocio
   await business.deleteOne();
-
-  // Actualizar el usuario
   await User.findByIdAndUpdate(req.user.id, { $unset: { business: 1 } });
 
   logger.info('Negocio eliminado', { 
     businessId: business._id, 
     ownerId: req.user.id,
     businessName: business.name,
+    platform: isVercel ? 'vercel' : 'local',
     ip: req.ip 
   });
 

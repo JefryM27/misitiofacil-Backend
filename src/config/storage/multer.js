@@ -6,7 +6,9 @@ import { v4 as uuidv4 } from 'uuid';
 
 const isProd = process.env.NODE_ENV === 'production';
 const storageType = (process.env.STORAGE_TYPE || '').toLowerCase(); // 'cloudinary' | 'local' | ''
-const useMemory = isProd || storageType === 'cloudinary';           // Vercel: true
+// ✅ CLAVE: Usar memoria en Vercel SIEMPRE
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.VERCEL_URL;
+const useMemory = isProd || storageType === 'cloudinary' || isVercel; // ✅ Forzar memory en Vercel
 
 // ---------------------------------------------
 // Config de tipos y límites
@@ -53,6 +55,12 @@ const getDestinationPath = (fieldname) => {
 };
 
 const ensureDir = async (dir) => {
+  // ✅ NO intentar crear directorios en Vercel
+  if (isVercel) {
+    console.log(`⚠️ Skipping directory creation in Vercel: ${dir}`);
+    return;
+  }
+  
   try {
     await fs.access(dir);
   } catch {
@@ -93,15 +101,19 @@ const createFileFilter = (type = 'images') => {
     file.__generatedFilename = filename;
     file.__uploadDir = uploadDir;
 
-    // Exponer metadata "tipo legacy" para tu código
+    // ✅ Exponer metadata "tipo legacy" para tu código
     if (!req.uploadedFiles) req.uploadedFiles = [];
     req.uploadedFiles.push({
       fieldname: file.fieldname,
       originalname: file.originalname,
       filename,
-      path: useMemory ? null : uploadDir + filename, // en memory no hay path en disco
+      // ✅ En Vercel, path será null y buffer estará en file.buffer
+      path: useMemory ? null : uploadDir + filename,
       mimetype: file.mimetype,
-      inMemory: useMemory
+      inMemory: useMemory,
+      // ✅ Metadata adicional para Vercel/Cloudinary
+      isVercel,
+      storageType: useMemory ? 'memory' : 'disk'
     });
 
     cb(null, true);
@@ -110,13 +122,18 @@ const createFileFilter = (type = 'images') => {
 
 // ---------------------------------------------
 // Storages
-// - En prod/cloudinary: memoryStorage
+// - En prod/cloudinary/Vercel: memoryStorage
 // - En dev/local: diskStorage (asegura directorios)
 // ---------------------------------------------
 const memoryStorage = multer.memoryStorage();
 
 const diskStorage = multer.diskStorage({
   destination: async (req, file, cb) => {
+    // ✅ Verificación adicional para Vercel
+    if (isVercel) {
+      return cb(new Error('Disk storage not supported in Vercel'), null);
+    }
+    
     try {
       const dest = file.__uploadDir || getDestinationPath(file.fieldname);
       await ensureDir(dest);
@@ -147,8 +164,11 @@ const diskStorage = multer.diskStorage({
   }
 });
 
-// El storage efectivo según entorno
+// ✅ El storage efectivo según entorno
 const storage = useMemory ? memoryStorage : diskStorage;
+
+// ✅ Log del modo de storage para debugging
+console.log(`📦 Multer storage mode: ${useMemory ? 'MEMORY' : 'DISK'} (isVercel: ${isVercel}, isProd: ${isProd}, storageType: ${storageType})`);
 
 // ---------------------------------------------
 // Factory de uploaders por tipo
@@ -206,7 +226,8 @@ export const handleMulterError = (err, req, res, next) => {
       case 'LIMIT_FILE_SIZE':
         return res.status(400).json({
           error: 'File too large',
-          message: 'El archivo excede el tamaño máximo permitido'
+          message: 'El archivo excede el tamaño máximo permitido',
+          maxSize: '2MB'
         });
       case 'LIMIT_FILE_COUNT':
         return res.status(400).json({
@@ -230,6 +251,14 @@ export const handleMulterError = (err, req, res, next) => {
     return res.status(400).json({ error: 'Invalid file type', message: err.message });
   }
 
+  // ✅ Error específico de Vercel disk storage
+  if (err?.message?.includes?.('Disk storage not supported')) {
+    return res.status(500).json({
+      error: 'Storage configuration error',
+      message: 'El almacenamiento en disco no está disponible en Vercel. Use STORAGE_TYPE=cloudinary'
+    });
+  }
+
   console.error('❌ Error de upload no manejado:', err);
   return res.status(500).json({
     error: 'Internal upload error',
@@ -238,10 +267,10 @@ export const handleMulterError = (err, req, res, next) => {
 };
 
 // ---------------------------------------------
-// Limpieza de temporales (solo dev/disk)
+// Limpieza de temporales (solo dev/disk, NO en Vercel)
 // ---------------------------------------------
 export const cleanupTempFiles = async (files) => {
-  if (!files) return;
+  if (!files || isVercel) return; // ✅ No cleanup en Vercel
 
   const arr = Array.isArray(files)
     ? files
@@ -271,5 +300,9 @@ export default {
   validateTotalSize,
   handleMulterError,
   cleanupTempFiles,
-  UPLOAD_CONFIG
+  UPLOAD_CONFIG,
+  // ✅ Exports útiles para debugging
+  isVercel,
+  useMemory,
+  storageMode: useMemory ? 'memory' : 'disk'
 };
