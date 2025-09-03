@@ -1,7 +1,7 @@
 // controllers/service.controller.js
 import Service from '../models/service.js';
 import Business from '../models/business.js';
-import Reservation from '../models/Reservation.js';
+import Reservation from '../models/reservation.js';
 import {
   controllerHandler,
 } from '../middleware/asyncHandler.js';
