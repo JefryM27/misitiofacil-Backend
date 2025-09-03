@@ -10,6 +10,7 @@ import templateRoutes from './template.routes.js';
 import reservationRoutes from './reservation.routes.js';
 import uploadRoutes from './upload.routes.js';
 import { Router } from 'express';
+import healthRoutes from './health.routes.js';
 
 const router = express.Router();
 
@@ -49,6 +50,7 @@ router.get('/health', (req, res) => {
 });
 
 // ✅ MONTAJE DE SUBRUTAS (nombres consistentes)
+router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/business', businessRoutes);
