@@ -22,6 +22,23 @@ export const database = {
   checkHealth: checkDatabaseHealth
 };
 
+// src/config/index.js (arriba del archivo)
+const isVercel = !!process.env.VERCEL;
+
+try {
+  // En Vercel permitimos arrancar aunque falte algo; el conector de Mongo ya valida en runtime.
+  if (!isVercel) {
+    validateEnv();                 // comportamiento estricto en local/producción tradicional
+  } else {
+    try { validateEnv(); } catch (e) {
+      console.warn('⚠️ validateEnv: faltan variables, ejecutando en modo serverless con validación diferida:', e.message);
+    }
+  }
+} catch (e) {
+  throw e; // fuera de Vercel seguimos estrictos
+}
+
+
 // Exportar configuraciones de storage
 export const storage = {
   ...storageConfig,
