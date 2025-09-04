@@ -9,6 +9,9 @@ import {
   generalRateLimit,
 } from '../middleware/security.js';
 
+// Auth JWT (requiere sesión)
+import { auth } from '../middleware/auth.js';
+
 // Sanitización
 import { sanitizeUserData } from '../middleware/index.js';
 
@@ -17,6 +20,9 @@ const router = express.Router();
 // Rate limiting
 const rateLimitStrict = generalRateLimit;
 const rateLimitAuth = authRateLimit;
+
+// Middleware de autenticación (cualquier rol)
+const requireAuth = auth(); // si tu auth acepta roles, déjalo sin args para "cualquiera"
 
 /**
  * @swagger
@@ -76,6 +82,28 @@ router.use(apiSecurityMiddleware);
 
 /**
  * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Obtener usuario autenticado
+ *     tags: [Auth]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Usuario autenticado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 user: { $ref: '#/components/schemas/User' }
+ *       401:
+ *         description: No autorizado
+ */
+router.get('/me', requireAuth, authController.me);
+
+/**
+ * @swagger
  * /api/auth/register:
  *   post:
  *     summary: Registrar nuevo usuario
@@ -95,10 +123,6 @@ router.use(apiSecurityMiddleware);
  *               $ref: '#/components/schemas/AuthResponse'
  *       400:
  *         description: Datos inválidos o usuario ya existe
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiError'
  *       429:
  *         description: Demasiadas solicitudes
  */
@@ -119,16 +143,8 @@ router.post('/register', rateLimitStrict, sanitizeUserData, authController.regis
  *     responses:
  *       200:
  *         description: Inicio de sesión exitoso
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
  *       401:
  *         description: Credenciales inválidas
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiError'
  *       429:
  *         description: Demasiados intentos de login
  */
@@ -144,17 +160,10 @@ router.post('/login', rateLimitAuth, sanitizeUserData, authController.login);
  *     responses:
  *       200:
  *         description: Sesión cerrada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: "Sesión cerrada exitosamente" }
  *       401:
  *         description: No autorizado
  */
-router.post('/logout', authController.logout);
+router.post('/logout', requireAuth, authController.logout);
 
 /**
  * @swagger

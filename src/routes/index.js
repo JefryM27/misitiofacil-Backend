@@ -12,6 +12,7 @@ import uploadRoutes from './upload.routes.js';
 import { Router } from 'express';
 import healthRoutes from './health.routes.js';
 
+
 const router = express.Router();
 
 // Endpoint base (GET /api)

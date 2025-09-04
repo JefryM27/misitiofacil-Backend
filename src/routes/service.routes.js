@@ -9,6 +9,7 @@ import {
   sanitizeServiceData,
   fullPagination,
   routeConfigs,
+  asyncHandler, // ✅ usar asyncHandler como en otros routers
 } from '../middleware/index.js';
 
 // Seguridad (puedes importar estos también desde middleware/index si prefieres)
@@ -42,9 +43,35 @@ router.use(apiSecurityMiddleware);
  */
 router.get(
   '/business/:businessId',
+  rateLimitStrict,
   fullPagination('service'),
   serviceController.getServicesByBusiness ||
     ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
+);
+
+/**
+ * @swagger
+ * /services:
+ *   post:
+ *     summary: 
+ *     tags: [Services]
+ */
+router.post(
+  '/',
+  rateLimitAuth,
+  requireOwner,
+  // Mapear business/body → params para reutilizar requireBusinessOwnership('businessId')
+  (req, _res, next) => {
+    const id = req.body?.business || req.body?.businessId;
+    if (id) req.params.businessId = id;
+    next();
+  },
+  requireBusinessOwnership('businessId'),
+  sanitizeServiceData,
+  (typeof serviceController.createService === 'function'
+    ? asyncHandler(serviceController.createService.bind(serviceController))
+    : (req, res) =>
+        res.status(501).json({ error: 'Método no implementado' }))
 );
 
 /**
@@ -56,11 +83,12 @@ router.get(
  */
 router.post(
   '/business/:businessId',
+  rateLimitAuth,
   requireOwner,
   requireBusinessOwnership('businessId'),
   sanitizeServiceData,
   (typeof serviceController.createService === 'function'
-    ? serviceController.createService.bind(serviceController)
+    ? asyncHandler(serviceController.createService.bind(serviceController))
     : (req, res) =>
         res.status(501).json({ error: 'Método no implementado' }))
 );
@@ -74,6 +102,7 @@ router.post(
  */
 router.get(
   '/search',
+  rateLimitStrict,
   fullPagination('service'),
   serviceController.searchServices ||
     ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
@@ -88,6 +117,7 @@ router.get(
  */
 router.get(
   '/popular',
+  rateLimitStrict,
   serviceController.getPopularServices ||
     ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
@@ -101,6 +131,7 @@ router.get(
  */
 router.get(
   '/categories',
+  rateLimitStrict,
   serviceController.getServiceCategories ||
     ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
@@ -114,6 +145,7 @@ router.get(
  */
 router.get(
   '/:serviceId',
+  rateLimitStrict,
   serviceController.getServiceById ||
     ((req, res) => res.status(501).json({ error: 'Método no implementado' }))
 );
@@ -127,9 +159,10 @@ router.get(
  */
 router.put(
   '/:serviceId',
+  rateLimitAuth,
   ...routeConfigs.service.update('serviceId'),
   (typeof serviceController.updateService === 'function'
-    ? serviceController.updateService.bind(serviceController)
+    ? asyncHandler(serviceController.updateService.bind(serviceController))
     : (req, res) =>
         res.status(501).json({ error: 'Método no implementado' }))
 );
@@ -143,6 +176,7 @@ router.put(
  */
 router.delete(
   '/:serviceId',
+  rateLimitAuth,
   requireOwner,
   requireServiceOwnership('serviceId'),
   serviceController.deleteService ||
@@ -158,6 +192,7 @@ router.delete(
  */
 router.put(
   '/:serviceId/toggle-status',
+  rateLimitAuth,
   requireOwner,
   requireServiceOwnership('serviceId'),
   serviceController.toggleServiceStatus ||
@@ -173,6 +208,7 @@ router.put(
  */
 router.post(
   '/:serviceId/duplicate',
+  rateLimitAuth,
   requireOwner,
   requireServiceOwnership('serviceId'),
   serviceController.duplicateService ||
@@ -188,6 +224,7 @@ router.post(
  */
 router.get(
   '/:serviceId/stats',
+  rateLimitStrict,
   requireOwner,
   requireServiceOwnership('serviceId'),
   serviceController.getServiceStats ||
@@ -206,6 +243,7 @@ router.get(
  */
 router.get(
   '/admin/analytics',
+  rateLimitStrict,
   requireOwnerOrAdmin,
   serviceController.getServicesAnalytics ||
     ((req, res) =>

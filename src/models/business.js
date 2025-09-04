@@ -1,4 +1,4 @@
-// models/business.js
+// src/models/business.js
 import mongoose from 'mongoose';
 import { constants } from '../config/index.js';
 
@@ -9,7 +9,6 @@ const {
   WEEKDAYS_SPANISH,
   VALIDATION_PATTERNS,
   APP_LIMITS,
-  THEME_COLORS,
   TEMPLATE_CATEGORIES,
   SUPPORTED_COUNTRIES
 } = constants;
@@ -88,10 +87,10 @@ const businessSchema = new Schema({
 
   slug: {
     type: String,
-    unique: true,
     trim: true,
     lowercase: true,
-    validate: { validator: s => VALIDATION_PATTERNS.BUSINESS_SLUG.test(s), message: 'El slug solo puede contener letras, números y guiones' }
+    index: true,
+    validate: { validator: s => !s || VALIDATION_PATTERNS.BUSINESS_SLUG.test(s), message: 'El slug solo puede contener letras, números y guiones' }
   },
 
   description: {
@@ -108,8 +107,8 @@ const businessSchema = new Schema({
     index: true
   },
 
-  // Template asociado
-  templateId: { type: Schema.Types.ObjectId, ref: 'Template', required: [true, 'El negocio debe tener un template asociado'] },
+  // Template asociado (NO obligatorio para no bloquear la creación)
+  templateId: { type: Schema.Types.ObjectId, ref: 'Template' },
 
   // Estado
   status: {
@@ -139,7 +138,7 @@ const businessSchema = new Schema({
   // Ubicación
   location: { type: locationSchema, default: () => ({}) },
 
-  // Horarios de operación (subschema coherente con virtuales)
+  // Horarios de operación
   operatingHours: { type: operatingHoursSchema, default: () => ({}) },
 
   // Imágenes
@@ -202,7 +201,7 @@ const businessSchema = new Schema({
 });
 
 /* =========================
- *  Virtuals
+ *  Virtuals y helpers
  * ========================= */
 
 businessSchema.virtual('siteUrl').get(function () {
@@ -222,7 +221,6 @@ businessSchema.virtual('categoryName').get(function () {
 businessSchema.virtual('isOpenNow').get(function () {
   const now = new Date();
   const idx = now.getDay(); // 0=Dom ... 6=Sáb
-  // Tus WEEKDAYS parecen ser MONDAY..SUNDAY; ajusto para que lunes sea index 1
   const dayKey = Object.values(WEEKDAYS)[idx === 0 ? 6 : idx - 1];
   const today = this.operatingHours?.[dayKey];
   if (!today || !today.isOpen || !today.openTime || !today.closeTime) return false;
@@ -231,11 +229,17 @@ businessSchema.virtual('isOpenNow').get(function () {
   return hhmm >= today.openTime && hhmm <= today.closeTime;
 });
 
+// Compatibilidad FE: permitir setear openingHours y guardarlo en operatingHours
+businessSchema.virtual('openingHours')
+  .get(function () { return this.operatingHours; })
+  .set(function (v) { this.operatingHours = v; });
+
 /* =========================
  *  Índices
  * ========================= */
 
-businessSchema.index({ owner: 1 });
+// ¡OJO! Index compuesto para que el mismo slug pueda repetirse por owner
+businessSchema.index({ owner: 1, slug: 1 }, { unique: true });
 businessSchema.index({ category: 1, status: 1 });
 businessSchema.index({ 'location.city': 1, 'location.province': 1 });
 businessSchema.index({ featured: 1, verified: 1 });
@@ -243,7 +247,6 @@ businessSchema.index({ 'stats.rating': -1 });
 businessSchema.index({ createdAt: -1 });
 businessSchema.index({ publishedAt: -1 });
 businessSchema.index({ templateId: 1 });
-businessSchema.index({ owner: 1, name: 1 }, { unique: true });
 
 businessSchema.index({
   name: 'text',
@@ -261,15 +264,14 @@ businessSchema.index({
  * ========================= */
 
 businessSchema.pre('save', function (next) {
-  if (this.isNew || this.isModified('name')) {
+  // Solo generar slug si NO viene; no lo mutamos si ya existe (evita desincronización con FE)
+  if ((this.isNew || this.isModified('name')) && !this.slug) {
     this.slug = this.name
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .trim();
-
-    this.slug = `${this.slug}-${this.owner.toString().slice(-6)}`;
   }
   next();
 });

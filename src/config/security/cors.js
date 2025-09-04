@@ -20,8 +20,10 @@ const log = (...args) => {
  * Allow lists
  * ──────────────────────────────────────────────────────────── */
 
-// Dominio del front en Vercel (explícito)
-const FRONT_VERCEL = normalizeOrigin('https://front-end-mi-sitio-facil.vercel.app');
+// Dominio del front en Vercel (CORREGIDO)
+const FRONT_VERCEL = normalizeOrigin('https://misitiofacil-frontend.vercel.app');
+// Dominio del back en Vercel (añadido explícito, útil para herramientas/preview)
+const BACKEND_VERCEL = normalizeOrigin('https://misitiofacil-backend.vercel.app');
 
 // Dominios de producción (.org)
 const DEFAULT_PROD_ORIGINS = [
@@ -55,11 +57,12 @@ function buildProdOrigins() {
 
   return uniq([
     ...DEFAULT_PROD_ORIGINS,
-    FRONT_VERCEL,     // explícito
-    frontend,         // ENV
-    admin,            // ENV
-    appUrl,           // ENV
-    ...fromEnv        // ENV (lista separada por comas)
+    FRONT_VERCEL,      // Front en Vercel
+    BACKEND_VERCEL,    // Back en Vercel (por si usas herramientas con origen backend)
+    frontend,          // ENV
+    admin,             // ENV
+    appUrl,            // ENV
+    ...fromEnv         // ENV (lista separada por comas)
   ]);
 }
 
@@ -145,7 +148,7 @@ const corsOptions = {
     'x-rate-limit-reset'
   ],
 
-  // Activa sólo si usas cookies/sesiones cross-site
+  // Mantener controlado por ENV (por defecto false, como sugiere la guía)
   credentials: process.env.CORS_CREDENTIALS === 'true',
 
   maxAge: 86400,

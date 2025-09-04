@@ -26,6 +26,12 @@ import { errorHandler, notFoundHandler } from './middleware/index.js';
 // ✅ helper serverless-friendly para Mongo
 import { connectMongoDB, closeMongoDB } from './config/database/mongodb.js';
 
+// ✅ Routers (montaje explícito requerido)
+import templateRoutes from './routes/template.routes.js';
+import businessRoutes from './routes/business.routes.js';
+// Si además tienes un index con otras rutas (auth, users, etc.), mantenlo:
+import apiRoutes from './routes/index.js';
+
 // Pull environment constants (fallbacks included)
 const { PORT = 3001, NODE_ENV = 'development' } = constants || {};
 const isProd = NODE_ENV === 'production';
@@ -65,44 +71,11 @@ app.use(
 );
 
 // ─────────────────────────────────────────────────────────────
-// Compression & CORS
+// Compression, CORS & Parsers
 // ─────────────────────────────────────────────────────────────
 app.use(compression());
 applyCors(app);
 
-// ─────────────────────────────────────────────────────────────
-// Rate limiting (más permisivo en Vercel para cold starts)
-// ─────────────────────────────────────────────────────────────
-const getRealIp = (req) =>
-  req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-  req.socket?.remoteAddress ||
-  req.ip;
-
-const generalLimiter = rateLimit({
-  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
-  // ✅ Más permisivo en Vercel debido a cold starts
-  max: Number(process.env.RATE_LIMIT_MAX_REQUESTS || (isVercel ? 200 : isProd ? 100 : 1000)),
-  message: { error: 'Too many requests from this IP, try again in 15 minutes.', retryAfter: '15 minutes' },
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getRealIp,
-  skip: (req) => process.env.SKIP_RATE_LIMIT === 'true' || ['127.0.0.1', '::1'].includes(getRealIp(req))
-});
-app.use(generalLimiter);
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: isVercel ? 10 : 5, // ✅ Más permisivo en Vercel
-  message: { error: 'Too many login attempts, try again in 15 minutes.', retryAfter: '15 minutes' },
-  skipSuccessfulRequests: true,
-  keyGenerator: getRealIp,
-  skip: (req) => NODE_ENV === 'development' && ['127.0.0.1', '::1'].includes(getRealIp(req))
-});
-app.use('/api/auth', authLimiter);
-
-// ─────────────────────────────────────────────────────────────
-// Parsers & logging
-// ─────────────────────────────────────────────────────────────
 app.use(
   express.json({
     limit: '10mb',
@@ -119,9 +92,39 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ✅ Logging simplificado en Vercel
+// ─────────────────────────────────────────────────────────────
+/* Rate limiting (más permisivo en Vercel para cold starts) */
+// ─────────────────────────────────────────────────────────────
+const getRealIp = (req) =>
+  req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+  req.socket?.remoteAddress ||
+  req.ip;
+
+const generalLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+  max: Number(process.env.RATE_LIMIT_MAX_REQUESTS || (isVercel ? 200 : isProd ? 100 : 1000)),
+  message: { error: 'Too many requests from this IP, try again in 15 minutes.', retryAfter: '15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getRealIp,
+  skip: (req) => process.env.SKIP_RATE_LIMIT === 'true' || ['127.0.0.1', '::1'].includes(getRealIp(req))
+});
+app.use(generalLimiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isVercel ? 10 : 5,
+  message: { error: 'Too many login attempts, try again in 15 minutes.', retryAfter: '15 minutes' },
+  skipSuccessfulRequests: true,
+  keyGenerator: getRealIp,
+  skip: (req) => NODE_ENV === 'development' && ['127.0.0.1', '::1'].includes(getRealIp(req))
+});
+app.use('/api/auth', authLimiter);
+
+// ─────────────────────────────────────────────────────────────
+// Logging
+// ─────────────────────────────────────────────────────────────
 if (isVercel) {
-  // En Vercel, usar logging mínimo
   app.use((req, res, next) => {
     console.log(`${req.method} ${req.originalUrl}`);
     next();
@@ -197,12 +200,10 @@ app.get('/', (_req, res) => {
 // ─────────────────────────────────────────────────────────────
 // API routes (lazy DB connect SOLO aquí)
 // ─────────────────────────────────────────────────────────────
-import apiRoutes from './routes/index.js';
 
 let mongoReadyPromise;
 
-// ✅ Mejorado: manejo de errores más robusto para Vercel
-const ensureDb = async (req, res, next) => {
+const ensureDb = async (_req, res, next) => {
   const mongoUri = config?.database?.mongodb?.uri;
   if (!mongoUri || mongoUri.includes('<db_password>')) {
     return res.status(503).json({
@@ -212,7 +213,6 @@ const ensureDb = async (req, res, next) => {
     });
   }
   try {
-    // ✅ En Vercel, usar conexión singleton para evitar múltiples conexiones
     if (!mongoReadyPromise) {
       mongoReadyPromise = connectMongoDB();
     }
@@ -220,7 +220,6 @@ const ensureDb = async (req, res, next) => {
     next();
   } catch (e) {
     logger.error('❌ Mongo connection error', { message: e?.message, isVercel });
-    // ✅ Reset promise en caso de error para reintento
     mongoReadyPromise = null;
     return res.status(503).json({
       success: false,
@@ -231,6 +230,19 @@ const ensureDb = async (req, res, next) => {
   }
 };
 
+/**
+ * ⬇️ Montaje explícito que pediste:
+ *    - /api/templates  → templateRoutes
+ *    - /api/business   → businessRoutes
+ *    (ambas con ensureDb)
+ */
+app.use('/api/templates', ensureDb, templateRoutes);
+app.use('/api/business', ensureDb, businessRoutes);
+
+/**
+ * Si además tienes un "routes/index.js" con otras rutas (auth, users, services…),
+ * lo montamos bajo /api. Asegúrate de que ese index NO vuelva a montar templates/business.
+ */
 app.use('/api', ensureDb, apiRoutes);
 
 // ─────────────────────────────────────────────────────────────
@@ -251,7 +263,7 @@ app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
 app.get('/docs', (_req, res) => res.redirect(302, '/api-docs'));
 
 // ─────────────────────────────────────────────────────────────
-// Errors (last)
+// 404 y errores (últimos middlewares)
 // ─────────────────────────────────────────────────────────────
 app.use(notFoundHandler);
 app.use(errorHandler);
@@ -272,10 +284,8 @@ export const closeDatabase = async () => {
 // ✅ CLAVE: Local bootstrap (Vercel NO usa esto)
 // ─────────────────────────────────────────────────────────────
 export const startServer = async () => {
-  // ✅ NO ejecutar servidor HTTP en Vercel
   if (isVercel) {
     console.log('🔧 Running on Vercel - serverless mode, skipping HTTP server');
-    // Solo conectar DB si es necesario para warmup
     try {
       if (process.env.VERCEL_WARMUP === 'true') {
         mongoReadyPromise ??= connectMongoDB();
@@ -285,10 +295,9 @@ export const startServer = async () => {
     } catch (e) {
       console.warn('⚠️ Vercel warmup failed:', e.message);
     }
-    return app; // Retornar app para uso serverless
+    return app;
   }
 
-  // ✅ Modo tradicional (desarrollo/Render/otras plataformas)
   try {
     mongoReadyPromise ??= connectMongoDB();
     await mongoReadyPromise;
@@ -313,5 +322,5 @@ export const startServer = async () => {
   return server;
 };
 
-// ✅ IMPORTANTE: Export por defecto para Vercel
+// ✅ IMPORTANTE: Export por defecto
 export default app;
